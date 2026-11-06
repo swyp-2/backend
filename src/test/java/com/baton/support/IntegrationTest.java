@@ -11,12 +11,13 @@ import org.springframework.test.context.ActiveProfiles;
 
 /**
  * API 통합 테스트용: 전체 컨텍스트 + Testcontainers PostgreSQL + MockMvc.
+ * 소셜 ID 토큰 검증은 {@link FakeSocialTokenVerifier}로 교체된다.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(TestcontainersConfig.class)
+@Import({TestcontainersConfig.class, FakeSocialAuthConfig.class})
 public @interface IntegrationTest {
 }

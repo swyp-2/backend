@@ -6,3 +6,11 @@ spring:
 logging:
   level:
     org.testcontainers: info
+
+baton:
+  auth:
+    jwt-secret: test-only-baton-jwt-secret-0123456789abcdef
+    google:
+      client-ids: test-google-ios,test-google-android,test-google-web
+    apple:
+      client-ids: test.apple.bundle.id

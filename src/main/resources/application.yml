@@ -29,3 +29,12 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+baton:
+  auth:
+    access-token-ttl: 30m
+    refresh-token-ttl: 14d
+    google:
+      jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+    apple:
+      jwk-set-uri: https://appleid.apple.com/auth/keys

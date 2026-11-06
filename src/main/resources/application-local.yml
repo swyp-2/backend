@@ -14,3 +14,14 @@ spring:
 logging:
   level:
     org.hibernate.SQL: debug
+
+baton:
+  auth:
+    # 로컬 전용 키. 운영 값과 절대 공유하지 말 것
+    jwt-secret: local-only-baton-jwt-secret-0123456789abcdef
+    google:
+      client-ids: local-google-client-id
+    apple:
+      client-ids: local.apple.bundle.id
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:5173
