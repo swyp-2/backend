@@ -36,11 +36,6 @@ public class AuthController {
                 TokenResponse.from(socialLoginService.complete(parseProvider(provider), request.idToken())), clock);
     }
 
-    @PostMapping("/refresh")
-    public ApiResponse<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
-        return ApiResponse.ok(TokenResponse.from(sessionService.refresh(request.refreshToken())), clock);
-    }
-
     /** PR-04: 현재 세션만 종료한다. 계정·매장 소속은 유지된다. */
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)

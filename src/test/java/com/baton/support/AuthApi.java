@@ -29,13 +29,7 @@ public final class AuthApi {
                 .content(jsonMapper.writeValueAsString(Map.of("id_token", idToken))));
     }
 
-    public ResultActions refresh(String refreshToken) throws Exception {
-        return mockMvc.perform(post("/auth/refresh")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(jsonMapper.writeValueAsString(Map.of("refresh_token", refreshToken))));
-    }
-
-    /** Google로 로그인해 data 노드(access_token, refresh_token, ...)를 돌려준다. */
+    /** Google로 로그인해 data 노드(access_token, expires_in, onboarding_stage)를 돌려준다. */
     public JsonNode login(String subject) throws Exception {
         return data(complete("google", FakeSocialTokenVerifier.idTokenFor(subject)).andExpect(status().isOk()));
     }

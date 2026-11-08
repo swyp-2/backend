@@ -12,8 +12,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties("baton.auth")
 public record AuthProperties(
         String jwtSecret,
-        @DefaultValue("30m") Duration accessTokenTtl,
-        @DefaultValue("14d") Duration refreshTokenTtl,
+        /** 액세스 토큰(=로그인 세션) 수명. 사용해도 연장하지 않는다. */
+        @DefaultValue("14d") Duration accessTokenTtl,
         Provider google,
         Provider apple
 ) {

@@ -52,7 +52,7 @@ class JwksSocialTokenVerifierTest {
     private final MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate)
             .ignoreExpectOrder(true).build();
     private final JwksSocialTokenVerifier verifier = new JwksSocialTokenVerifier(
-            new AuthProperties("unit-test-secret-0123456789abcdef0123", Duration.ofMinutes(30), Duration.ofDays(14),
+            new AuthProperties("unit-test-secret-0123456789abcdef0123", Duration.ofDays(14),
                     new AuthProperties.Provider(List.of("google-ios-client", GOOGLE_WEB_CLIENT), GOOGLE_JWKS),
                     new AuthProperties.Provider(List.of(APPLE_BUNDLE), APPLE_JWKS)),
             restTemplate, Clock.fixed(NOW, ZoneOffset.UTC));

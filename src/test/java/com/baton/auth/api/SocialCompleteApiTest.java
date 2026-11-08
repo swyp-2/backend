@@ -13,6 +13,9 @@ import com.baton.auth.domain.SocialProvider;
 import com.baton.support.AuthApi;
 import com.baton.support.FakeSocialTokenVerifier;
 import com.baton.support.IntegrationTest;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -25,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import tools.jackson.databind.JsonNode;
@@ -52,8 +56,8 @@ class SocialCompleteApiTest {
         authApi.complete("google", FakeSocialTokenVerifier.idTokenFor(subject))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.access_token").isString())
-                .andExpect(jsonPath("$.data.refresh_token").isString())
-                .andExpect(jsonPath("$.data.expires_in").value(1800))
+                .andExpect(jsonPath("$.data.refresh_token").doesNotExist())
+                .andExpect(jsonPath("$.data.expires_in").value(1_209_600))
                 .andExpect(jsonPath("$.data.onboarding_stage").value("CONSENT_REQUIRED"))
                 .andExpect(jsonPath("$.meta.server_time").isString())
                 .andExpect(content().string(not(containsString(subject))));
@@ -76,6 +80,28 @@ class SocialCompleteApiTest {
         assertThat(socialAccountCount(SocialProvider.GOOGLE, subject)).isEqualTo(1);
         assertThat(jdbcTemplate.queryForObject("select count(*) from auth_sessions where user_id = ?",
                 Integer.class, firstUser)).isEqualTo(2);
+    }
+
+    @Test
+    void 세션_만료_시각은_토큰_exp와_같고_발급_후_14일이다() throws Exception {
+        String accessToken = authApi.login(newSubject()).get("access_token").asString();
+        Jwt jwt = accessTokenService.decoder().decode(accessToken);
+        long sessionId = ((Number) jwt.getClaims().get("sid")).longValue();
+
+        Instant sessionExpiresAt = jdbcTemplate.queryForObject(
+                "select expires_at from auth_sessions where id = ?", Timestamp.class, sessionId).toInstant();
+
+        assertThat(sessionExpiresAt).isEqualTo(jwt.getExpiresAt());
+        assertThat(Duration.between(jwt.getIssuedAt(), jwt.getExpiresAt())).isEqualTo(Duration.ofDays(14));
+    }
+
+    @Test
+    void refresh_엔드포인트는_없다() throws Exception {
+        mockMvc.perform(post("/auth/refresh")
+                        .contentType("application/json")
+                        .content("{\"refresh_token\":\"anything\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("UNAUTHENTICATED"));
     }
 
     @Test

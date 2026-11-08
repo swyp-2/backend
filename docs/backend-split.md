@@ -1,7 +1,7 @@
 # 백엔드 분담
 
 ## A: 회원·매장·근무
-POST /auth/{provider}/complete, POST /auth/refresh, POST /auth/logout, GET /me, GET /consent-documents,
+POST /auth/{provider}/complete, POST /auth/logout, GET /me, GET /consent-documents,
 POST /me/consents, PUT /me/onboarding/name, PUT /me/onboarding/role, POST /stores, GET /stores/{store_id},
 GET /stores/{store_id}/invite-code, POST /memberships/join, GET /stores/{store_id}/members,
 GET /stores/{store_id}/shifts, GET /shifts/{shift_id}, POST /shift-batches/preview, POST /shift-batches,

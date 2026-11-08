@@ -22,23 +22,25 @@ class AccessTokenServiceTest {
     private final AccessTokenService service = serviceAt(NOW, SECRET);
 
     @Test
-    void claim은_sub_sid_iat_exp만_담고_수명은_30분이다() {
+    void claim은_sub_sid_iat_exp만_담고_수명은_14일이다() {
         Jwt jwt = service.decoder().decode(service.issue(7L, 42L));
 
         assertThat(jwt.getClaims().keySet()).containsExactlyInAnyOrder("sub", "sid", "iat", "exp");
         assertThat(jwt.getSubject()).isEqualTo("7");
         assertThat(((Number) jwt.getClaims().get("sid")).longValue()).isEqualTo(42L);
-        assertThat(jwt.getExpiresAt()).isEqualTo(NOW.plus(Duration.ofMinutes(30)));
+        assertThat(jwt.getExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(14)));
         assertThat(jwt.getHeaders()).containsEntry("alg", "HS256");
-        assertThat(service.ttlSeconds()).isEqualTo(1800);
+        assertThat(service.ttlSeconds()).isEqualTo(14 * 24 * 60 * 60);
     }
 
     @Test
-    void 만료_시각이_지나면_거부한다() {
+    void 만료_직전에는_통과하고_만료_시각이_지나면_거부한다() {
         String token = service.issue(7L, 42L);
-        AccessTokenService later = serviceAt(NOW.plus(Duration.ofMinutes(30)).plusSeconds(1), SECRET);
+        AccessTokenService justBefore = serviceAt(NOW.plus(Duration.ofDays(14)).minusSeconds(1), SECRET);
+        AccessTokenService after = serviceAt(NOW.plus(Duration.ofDays(14)).plusSeconds(1), SECRET);
 
-        assertThatThrownBy(() -> later.decoder().decode(token)).isInstanceOf(JwtException.class);
+        assertThat(justBefore.decoder().decode(token).getSubject()).isEqualTo("7");
+        assertThatThrownBy(() -> after.decoder().decode(token)).isInstanceOf(JwtException.class);
     }
 
     @Test
@@ -61,12 +63,12 @@ class AccessTokenServiceTest {
 
     @Test
     void 짧은_서명_키는_설정_단계에서_거부한다() {
-        assertThatThrownBy(() -> new AuthProperties("too-short", Duration.ofMinutes(30), Duration.ofDays(14), null, null))
+        assertThatThrownBy(() -> new AuthProperties("too-short", Duration.ofDays(14), null, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static AccessTokenService serviceAt(Instant now, String secret) {
-        AuthProperties properties = new AuthProperties(secret, Duration.ofMinutes(30), Duration.ofDays(14), null, null);
+        AuthProperties properties = new AuthProperties(secret, Duration.ofDays(14), null, null);
         return new AccessTokenService(properties, Clock.fixed(now, ZoneOffset.UTC));
     }
 }

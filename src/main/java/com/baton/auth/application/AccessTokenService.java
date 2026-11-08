@@ -23,7 +23,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.stereotype.Component;
 
 /**
- * 자체 액세스 토큰(HS256). claim은 sub(user_id), sid(auth_sessions.id)와 수명 표시용 iat·exp만 둔다.
+ * 자체 액세스 토큰(HS256). 로그인 때 한 번 발급하며 refresh는 없다.
+ * claim은 sub(user_id), sid(auth_sessions.id)와 수명 표시용 iat·exp만 둔다.
  */
 @Component
 public class AccessTokenService {
@@ -44,15 +45,23 @@ public class AccessTokenService {
     }
 
     public String issue(long userId, long sessionId) {
-        Instant now = clock.instant();
+        return issue(userId, sessionId, clock.instant());
+    }
+
+    /** issuedAt + 수명(기본 14일)에 만료. 사용해도 연장하지 않는다. */
+    public String issue(long userId, long sessionId, Instant issuedAt) {
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .subject(String.valueOf(userId))
                 .claim(SESSION_ID_CLAIM, sessionId)
-                .issuedAt(now)
-                .expiresAt(now.plus(ttl))
+                .issuedAt(issuedAt)
+                .expiresAt(expiresAt(issuedAt))
                 .build();
         return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
+    }
+
+    public Instant expiresAt(Instant issuedAt) {
+        return issuedAt.plus(ttl);
     }
 
     public long ttlSeconds() {
