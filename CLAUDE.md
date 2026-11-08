@@ -51,6 +51,8 @@ com.baton
 - 스키마 변경은 새 Flyway 마이그레이션 파일로만. 기존 마이그레이션 수정 금지
 - 응답에 이메일, 소셜 식별자, 토큰 원문을 절대 포함하지 않는다
 - 엔티티를 컨트롤러 응답으로 직접 반환하지 않는다 (record DTO 사용)
+- enum 컬럼은 @Enumerated(EnumType.STRING) + DB CHECK 제약
+  - 예외: consent_documents.kind는 문서 종류 미정으로 String (DB는 CHECK (kind ~ '^[A-Z_]{1,30}$'))
 - Lombok은 @Getter, @NoArgsConstructor(access = PROTECTED), @RequiredArgsConstructor만 사용
 
 ## 테스트
