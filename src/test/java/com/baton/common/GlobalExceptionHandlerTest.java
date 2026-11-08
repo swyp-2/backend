@@ -98,6 +98,14 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void 필수_헤더_누락은_422이고_헤더_이름을_field로_쓴다() throws Exception {
+        mockMvc.perform(get("/test-errors/header"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.error.field_errors[0].field").value("Idempotency-Key"));
+    }
+
+    @Test
     void 없는_경로는_404_NOT_FOUND() throws Exception {
         mockMvc.perform(get("/no-such-path"))
                 .andExpect(status().isNotFound())
