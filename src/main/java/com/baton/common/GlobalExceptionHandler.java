@@ -12,6 +12,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -67,6 +68,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException e) {
         return validationFailed(List.of(new FieldError(toSnakeCase(e.getParameterName()), "필수 값이에요.")));
+    }
+
+    /** 필수 헤더(@RequestHeader) 누락. 헤더 이름은 그대로 field로 쓴다(예: Idempotency-Key). */
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException e) {
+        return validationFailed(List.of(new FieldError(e.getHeaderName(), "필수 헤더예요.")));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
