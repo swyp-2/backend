@@ -1,0 +1,6 @@
+# 접속 정보와 비밀 값은 전부 환경변수로 주입한다. 이 파일에 값을 쓰지 말 것.
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}

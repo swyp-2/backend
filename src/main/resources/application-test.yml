@@ -1,0 +1,4 @@
+# 데이터소스는 Testcontainers(@ServiceConnection)가 주입한다.
+logging:
+  level:
+    org.testcontainers: info
