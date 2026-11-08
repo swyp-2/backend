@@ -14,15 +14,17 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # 파일 이름은 V{yyyyMMddHHmm}__{a|b}_{설명}.sql (타임스탬프 버전).
+    # 머지 순서가 엇갈려 더 이른 번호가 나중에 들어와도 적용되게 한다
+    out-of-order: true
   jackson:
     property-naming-strategy: SNAKE_CASE
     deserialization:
       fail-on-unknown-properties: false
-
-server:
-  error:
-    include-stacktrace: never
-    include-message: never
+  web:
+    error:
+      include-stacktrace: never
+      include-message: never
 
 springdoc:
   api-docs:
