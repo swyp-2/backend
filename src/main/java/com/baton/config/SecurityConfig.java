@@ -1,60 +1,101 @@
 package com.baton.config;
 
-import com.baton.common.ErrorCode;
-import com.baton.common.ErrorResponse;
-import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import lombok.RequiredArgsConstructor;
+import com.baton.auth.application.AccessTokenService;
+import com.baton.auth.security.SessionCheckingJwtConverter;
+import com.baton.auth.security.TestUserAuthenticationFilter;
+import com.baton.config.security.JsonAccessDeniedHandler;
+import com.baton.config.security.JsonAuthenticationEntryPoint;
+import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.MediaType;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
-import tools.jackson.databind.json.JsonMapper;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * 골격 단계의 임시 설정: 헬스체크와 API 문서만 공개하고 나머지는 인증 필요.
- * JWT 리소스 서버 설정은 인증 기능 구현 때 추가한다.
+ * 자체 액세스 토큰(HS256 JWT) 리소스 서버. 서명·만료 검증 후 SessionCheckingJwtConverter가
+ * 세션 폐기·계정 탈퇴를 DB로 확인한다.
  */
 @Configuration(proxyBeanMethods = false)
-@RequiredArgsConstructor
+@EnableConfigurationProperties({AuthProperties.class, CorsProperties.class})
 public class SecurityConfig {
 
-    private static final String[] PUBLIC_PATHS = {
+    /** 로그인 전 호출하는 인증 API. 만료된 Authorization 헤더가 붙어 와도 무시한다. */
+    private static final List<String> TOKEN_ISSUING_PATHS = List.of(
+            "/auth/google/complete",
+            "/auth/apple/complete",
+            "/auth/refresh"
+    );
+
+    private static final String[] DOC_PATHS = {
             "/health",
             "/swagger-ui.html",
             "/swagger-ui/**",
             "/v3/api-docs/**",
     };
 
-    private final JsonMapper jsonMapper;
-
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                                   AccessTokenService accessTokenService,
+                                                   SessionCheckingJwtConverter sessionCheckingJwtConverter,
+                                                   JsonAuthenticationEntryPoint authenticationEntryPoint,
+                                                   JsonAccessDeniedHandler accessDeniedHandler,
+                                                   ObjectProvider<TestUserAuthenticationFilter> testUserFilter)
+            throws Exception {
+        http
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
+                .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(PUBLIC_PATHS).permitAll()
+                        .requestMatchers(TOKEN_ISSUING_PATHS.toArray(String[]::new)).permitAll()
+                        .requestMatchers(DOC_PATHS).permitAll()
                         .anyRequest().authenticated())
+                .oauth2ResourceServer(resourceServer -> resourceServer
+                        .bearerTokenResolver(bearerTokenResolver())
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
+                        .jwt(jwt -> jwt
+                                .decoder(accessTokenService.decoder())
+                                .jwtAuthenticationConverter(sessionCheckingJwtConverter)))
                 .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint((request, response, e) ->
-                                writeError(response, ErrorCode.UNAUTHENTICATED))
-                        .accessDeniedHandler((request, response, e) ->
-                                writeError(response, ErrorCode.FORBIDDEN)))
-                .build();
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler));
+        // local·test 프로필에만 존재
+        testUserFilter.ifAvailable(filter -> http.addFilterBefore(filter, BearerTokenAuthenticationFilter.class));
+        return http.build();
     }
 
-    private void writeError(HttpServletResponse response, ErrorCode errorCode) throws IOException {
-        response.setStatus(errorCode.getStatus().value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        jsonMapper.writeValue(response.getOutputStream(), ErrorResponse.of(errorCode));
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(CorsProperties corsProperties) {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        if (corsProperties.allowedOrigins().isEmpty()) {
+            return source;
+        }
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(corsProperties.allowedOrigins());
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(false);
+        configuration.setMaxAge(3600L);
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    private static BearerTokenResolver bearerTokenResolver() {
+        DefaultBearerTokenResolver delegate = new DefaultBearerTokenResolver();
+        return request -> TOKEN_ISSUING_PATHS.contains(request.getRequestURI()) ? null : delegate.resolve(request);
     }
 }
