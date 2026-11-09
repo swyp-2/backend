@@ -104,6 +104,18 @@ public class ShiftPlanCalculator {
         if (startsAt == null || endsAt == null) {
             return null;
         }
+        // 완전 동일 중복(B05)을 시각 일치로 판정하므로 분 단위만 받는다(2026-11-10 결정).
+        boolean startsOk = isWholeMinute(startsAt);
+        boolean endsOk = isWholeMinute(endsAt);
+        if (!startsOk) {
+            errors.add(new FieldError(F_STARTS_AT, "시작 시각은 분 단위로 입력해 주세요."));
+        }
+        if (!endsOk) {
+            errors.add(new FieldError(F_ENDS_AT, "종료 시각은 분 단위로 입력해 주세요."));
+        }
+        if (!startsOk || !endsOk) {
+            return null;
+        }
         Duration length = Duration.between(startsAt, endsAt);
         if (length.isNegative() || length.isZero()) {
             errors.add(new FieldError(F_ENDS_AT, "종료 시각은 시작 시각보다 늦어야 해요."));
@@ -171,6 +183,10 @@ public class ShiftPlanCalculator {
             result.add(DayOfWeek.of(v));
         }
         return result;
+    }
+
+    private static boolean isWholeMinute(Instant instant) {
+        return Math.floorMod(instant.getEpochSecond(), 60) == 0 && instant.getNano() == 0;
     }
 
     private static LocalDate localDate(Instant instant) {

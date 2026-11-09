@@ -124,6 +124,20 @@ class ShiftPlanCalculatorTest {
     }
 
     @Test
+    @DisplayName("초·나노초가 있는 시각은 분 단위가 아니라서 거부")
+    void wholeMinutesOnly() {
+        Instant s = kst("2026-11-11", "09:00");
+        Instant e = kst("2026-11-11", "13:00");
+
+        assertFieldErrors(() -> calculator.plan(input(List.of(1L), s.plusSeconds(1), e, null)),
+                ShiftPlanCalculator.F_STARTS_AT);
+        assertFieldErrors(() -> calculator.plan(input(List.of(1L), s, e.plusNanos(1), null)),
+                ShiftPlanCalculator.F_ENDS_AT);
+        assertFieldErrors(() -> calculator.plan(input(List.of(1L), s.plusMillis(500), e.plusSeconds(30), null)),
+                ShiftPlanCalculator.F_STARTS_AT, ShiftPlanCalculator.F_ENDS_AT);
+    }
+
+    @Test
     @DisplayName("요일 0개·8·기간에 없는 요일만 선택 → 거부")
     void invalidWeekdays() {
         Instant s = kst("2026-11-11", "09:00"); // 수요일

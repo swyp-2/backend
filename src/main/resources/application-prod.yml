@@ -33,5 +33,7 @@ baton:
       client-ids: ${BATON_GOOGLE_CLIENT_IDS}
     apple:
       client-ids: ${BATON_APPLE_CLIENT_IDS}
+  shift:
+    preview-secret: ${BATON_SHIFT_PREVIEW_SECRET}
   cors:
     allowed-origins: ${BATON_CORS_ALLOWED_ORIGINS:}

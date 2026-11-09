@@ -28,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
         "BATON_JWT_SECRET=prod-profile-test-secret-0123456789abcdef",
         "BATON_GOOGLE_CLIENT_IDS=prod-google-client",
         "BATON_APPLE_CLIENT_IDS=prod.apple.bundle",
+        "BATON_SHIFT_PREVIEW_SECRET=prod-profile-test-preview-secret-0123456789",
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")

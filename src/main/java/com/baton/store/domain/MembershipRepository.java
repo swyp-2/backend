@@ -2,6 +2,7 @@ package com.baton.store.domain;
 
 import com.baton.member.domain.Role;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -34,6 +35,28 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
             where m.storeId = :storeId and m.state = com.baton.store.domain.MembershipState.ACTIVE
             """)
     List<MemberRow> findActiveMemberRows(@Param("storeId") Long storeId);
+
+    /** 근무 일괄 등록 미리보기: 지정한 소속 중 그 매장 ACTIVE인 것(이름 포함). */
+    @Query("""
+            select new com.baton.store.domain.MemberRow(m.id, m.userId, u.displayName, m.role, m.personalColor)
+            from Membership m join User u on u.id = m.userId
+            where m.storeId = :storeId and m.id in :ids
+              and m.state = com.baton.store.domain.MembershipState.ACTIVE
+            """)
+    List<MemberRow> findActiveMemberRowsByIds(@Param("storeId") Long storeId, @Param("ids") Collection<Long> ids);
+
+    /**
+     * SELECT ... FOR SHARE, id 오름차순. 근무 일괄 등록 중 담당자가 나가기·탈퇴(FOR UPDATE)로 비활성화되지 않게 한다.
+     * 일괄 등록끼리는 서로 막지 않는다. 잠금 순서: membership → shift → substitute_request.
+     */
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("""
+            select m from Membership m
+            where m.storeId = :storeId and m.id in :ids
+              and m.state = com.baton.store.domain.MembershipState.ACTIVE
+            order by m.id
+            """)
+    List<Membership> findActiveByIdsForShare(@Param("storeId") Long storeId, @Param("ids") Collection<Long> ids);
 
     /** SELECT ... FOR UPDATE. 잠금 순서: membership → shift → substitute_request. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
