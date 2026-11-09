@@ -34,8 +34,8 @@ springdoc:
 
 baton:
   auth:
-    access-token-ttl: 30m
-    refresh-token-ttl: 14d
+    # 로그인 세션 수명. 사용해도 연장하지 않고, 만료되면 다시 소셜 로그인한다.
+    access-token-ttl: 14d
     google:
       jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
     apple:

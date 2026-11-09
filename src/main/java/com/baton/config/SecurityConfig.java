@@ -33,8 +33,7 @@ public class SecurityConfig {
     /** 로그인 전 호출하는 인증 API. 만료된 Authorization 헤더가 붙어 와도 무시한다. */
     private static final List<String> TOKEN_ISSUING_PATHS = List.of(
             "/auth/google/complete",
-            "/auth/apple/complete",
-            "/auth/refresh"
+            "/auth/apple/complete"
     );
 
     private static final String[] DOC_PATHS = {

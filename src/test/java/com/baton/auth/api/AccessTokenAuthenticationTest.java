@@ -6,12 +6,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.baton.auth.application.AccessTokenService;
-import com.baton.config.AuthProperties;
 import com.baton.support.AuthApi;
 import com.baton.support.IntegrationTest;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
-import java.time.ZoneOffset;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,6 @@ class AccessTokenAuthenticationTest {
     @Autowired JsonMapper jsonMapper;
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired AccessTokenService accessTokenService;
-    @Autowired AuthProperties authProperties;
     @Autowired Clock clock;
 
     AuthApi authApi;
@@ -53,14 +51,30 @@ class AccessTokenAuthenticationTest {
     }
 
     @Test
-    void 만료된_토큰은_401() throws Exception {
+    void 발급_후_14일이_되기_직전까지는_인증된다() throws Exception {
         JsonNode tokens = authApi.login(newSubject());
-        // 같은 키로 31분 전에 발급된 토큰
-        AccessTokenService past = new AccessTokenService(authProperties,
-                Clock.fixed(clock.instant().minus(Duration.ofMinutes(31)), ZoneOffset.UTC));
-        String expired = past.issue(userIdOf(tokens), sessionIdOf(tokens));
+        String almostExpired = accessTokenService.issue(userIdOf(tokens), sessionIdOf(tokens),
+                clock.instant().minus(Duration.ofDays(14)).plusSeconds(60));
+
+        call(almostExpired).andExpect(status().isOk());
+    }
+
+    @Test
+    void 발급_후_14일이_지난_토큰은_401() throws Exception {
+        JsonNode tokens = authApi.login(newSubject());
+        String expired = accessTokenService.issue(userIdOf(tokens), sessionIdOf(tokens),
+                clock.instant().minus(Duration.ofDays(14)).minusSeconds(1));
 
         assertUnauthenticated(call(expired));
+    }
+
+    @Test
+    void 세션_만료_시각이_지나면_토큰이_남아_있어도_401() throws Exception {
+        JsonNode tokens = authApi.login(newSubject());
+        jdbcTemplate.update("update auth_sessions set expires_at = ? where id = ?",
+                Timestamp.from(clock.instant().minusSeconds(1)), sessionIdOf(tokens));
+
+        assertUnauthenticated(call(tokens.get("access_token").asString()));
     }
 
     @Test

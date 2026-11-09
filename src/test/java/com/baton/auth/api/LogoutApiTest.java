@@ -73,20 +73,6 @@ class LogoutApiTest {
     }
 
     @Test
-    void 로그아웃한_세션의_refresh_토큰을_다시_쓰면_재사용으로_보고_모든_세션을_폐기한다() throws Exception {
-        String subject = newSubject();
-        JsonNode thisDevice = authApi.login(subject);
-        JsonNode otherDevice = authApi.login(subject);
-        mockMvc.perform(post("/auth/logout").header("Authorization", bearer(accessOf(thisDevice))))
-                .andExpect(status().isNoContent());
-
-        authApi.refresh(thisDevice.get("refresh_token").asString()).andExpect(status().isUnauthorized());
-
-        mockMvc.perform(get("/test-auth/whoami").header("Authorization", bearer(accessOf(otherDevice))))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
     void 토큰_없이_로그아웃하면_401() throws Exception {
         mockMvc.perform(post("/auth/logout"))
                 .andExpect(status().isUnauthorized())

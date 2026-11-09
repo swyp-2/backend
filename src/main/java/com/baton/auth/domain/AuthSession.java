@@ -11,11 +11,9 @@ import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 /**
- * refresh 토큰 세션. 토큰 원문은 저장하지 않고 SHA-256 hex(64자)만 저장한다.
+ * 로그인 세션. 액세스 토큰의 sid가 이 id를 가리키며, 토큰 원문은 저장하지 않는다.
  */
 @Getter
 @Entity
@@ -31,10 +29,6 @@ public class AuthSession {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @JdbcTypeCode(SqlTypes.CHAR)
-    @Column(name = "refresh_token_hash", nullable = false, length = 64)
-    private String refreshTokenHash;
-
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
@@ -44,10 +38,9 @@ public class AuthSession {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public static AuthSession open(Long userId, String refreshTokenHash, Instant expiresAt, Instant now) {
+    public static AuthSession open(Long userId, Instant expiresAt, Instant now) {
         AuthSession session = new AuthSession();
         session.userId = userId;
-        session.refreshTokenHash = refreshTokenHash;
         session.expiresAt = expiresAt;
         session.createdAt = now;
         return session;

@@ -49,6 +49,7 @@ com.baton
   DB 유니크/부분 유니크 인덱스로 보장하고 DataIntegrityViolationException을 도메인 에러로 변환
 - 잠금 순서: membership → shift → substitute_request (교착 방지, B와 공통 규칙)
 - 스키마 변경은 새 Flyway 마이그레이션 파일로만. 기존 마이그레이션 수정 금지
+- Flyway 번호는 V{yyyyMMddHHmm}__a_설명.sql처럼 타임스탬프로 작성 (예: V202611091530__a_add_invite_code_index.sql)
 - 응답에 이메일, 소셜 식별자, 토큰 원문을 절대 포함하지 않는다
 - 엔티티를 컨트롤러 응답으로 직접 반환하지 않는다 (record DTO 사용)
 - enum 컬럼은 @Enumerated(EnumType.STRING) + DB CHECK 제약
