@@ -15,6 +15,7 @@
 | ID·버전 | ID는 불투명 식별자. 변경은 expected\_version 등 최신성 검사·서버 현재 상태 재확인. 필드명은 개발팀 최종 확정. |
 | 목록 | 요청·알림은 생성 시각 DESC, ID DESC. 기본 20개·커서 추가 조회. 상태 변경으로 요청 순서 재정렬 안 함. |
 | 오류 | 인증 만료·권한 없음·입력 오류·없는 데이터·상태 충돌·조회/저장 실패를 구분. HTTP 매핑은 아래 제안. |
+| 본문 없는 성공 | 응답 본문이 없는 성공은 204 No Content(data·meta 없음). 예: POST /auth/logout. |
 | 개인정보 | 일반 구성원 응답에 이메일·소셜 식별자 미포함. 파기 대상 스냅샷의 이름을 예외 보관하지 않음. |
 | 제외 | 근무 수정 PATCH·변경 이력 조회·알림 pending 필터·코드 재발급·공유 링크·푸시 API는 이번 초안에 없음. |
 
@@ -99,6 +100,10 @@
 | REQUEST\_EXPIRED | 409 | 시작 시각 이후 처리 불가. |
 | PREVIEW\_STALE | 409 | 입력 유지·미리보기 재계산 요청. |
 | FUTURE\_SHIFT\_REMAINS | 409 | 예정/진행 근무 정리 안내. 소속 해제·탈퇴 미확정. |
+| ONBOARDING\_STAGE\_CONFLICT | 409 | 현재 가입 단계에서 할 수 없는 작업(이미 지난 단계 재제출 등). current\_state에 현재 onboarding\_stage. GET /me 재조회 후 next\_screen으로 이동. |
+| ALREADY\_IN\_STORE | 409 | 이미 활성 매장 소속이 있어 매장 생성·참여 불가(계정당 활성 매장 1개). |
+| SHIFT\_STATE\_CONFLICT | 409 | 근무가 삭제됐거나 담당자·버전이 바뀜. 최신 근무 재조회. |
+| IDEMPOTENCY\_KEY\_REUSED | 422 | 같은 Idempotency-Key를 다른 요청 내용으로 재사용. 새 키로 다시 요청. |
 | INTERNAL\_ERROR | 5xx | 완료 표시 금지. 중복 방지 키로 재시도 가능 여부 확인. |
 
 ## 4. 일괄 등록 예시

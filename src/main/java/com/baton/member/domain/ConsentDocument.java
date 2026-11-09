@@ -39,6 +39,7 @@ public class ConsentDocument {
     @Column(name = "title", nullable = false, length = 100)
     private String title;
 
+    /** 약관 본문 URL(https 절대 경로). */
     @Column(name = "body_reference", nullable = false, length = 500)
     private String bodyReference;
 
