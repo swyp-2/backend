@@ -43,7 +43,8 @@ com.baton
 - 권한: 요청 본문의 userId/role/membershipId를 권한 근거로 쓰지 않는다. 인증 정보와 DB의 활성 소속으로 판정
 - 시간: DB는 timestamptz, Java는 Instant. 월/날짜/요일 계산만 ZoneId.of("Asia/Seoul").
   현재 시각은 항상 주입받은 Clock에서 가져온다 (Instant.now() 직접 호출 금지)
-- JSON 필드는 snake_case. 응답은 {"data": ..., "meta": {"server_time": ...}} 형식
+- JSON 필드는 snake_case. 응답은 {"data": ..., "meta": {"server_time": ...}} 형식.
+  응답 본문이 없는 성공은 204 No Content
 - 에러는 ErrorCode enum + BusinessException. 새 에러 코드가 필요하면 추가 제안 후 사용
 - 동시성: 수정 대상 엔티티는 @Version. 중복 방지는 조회 후 검사만으로 끝내지 말고
   DB 유니크/부분 유니크 인덱스로 보장하고 DataIntegrityViolationException을 도메인 에러로 변환

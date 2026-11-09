@@ -24,6 +24,7 @@ public class ConsentDocumentController {
                 .toList(), clock);
     }
 
+    /** @param bodyReference 약관 본문 URL(https 절대 경로). 프론트는 CO-03에서 이 URL의 본문을 표시한다. */
     public record ConsentDocumentResponse(long documentId, String kind, int version, String title,
                                           boolean required, String bodyReference) {
 

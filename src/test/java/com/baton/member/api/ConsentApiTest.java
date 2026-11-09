@@ -67,7 +67,8 @@ class ConsentApiTest {
                 .andExpect(jsonPath("$.data[?(@.kind == 'MARKETING')].title").value("(임시) 마케팅 정보 수신 동의"))
                 .andExpect(jsonPath("$.data[0].document_id").isNumber())
                 .andExpect(jsonPath("$.data[0].version").value(1))
-                .andExpect(jsonPath("$.data[0].body_reference").value("TBD"))
+                .andExpect(jsonPath("$.data[?(@.kind == 'TERMS_OF_SERVICE')].body_reference")
+                        .value("https://example.com/baton/terms/terms-of-service/v1"))
                 .andExpect(jsonPath("$.meta.server_time").exists());
     }
 

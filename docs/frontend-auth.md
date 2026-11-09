@@ -73,7 +73,7 @@ POST /auth/{google|apple}/complete  ──►  access_token(14일) + onboarding_
 |---|---|---|
 | id_token 누락·공백 | 422 | `VALIDATION_FAILED` (`field_errors[0].field = "id_token"`) |
 | 서명·발급자·대상(aud)·만료 검증 실패 | 401 | `UNAUTHENTICATED` |
-| 지원하지 않는 provider 경로 | 401 | `UNAUTHENTICATED` |
+| 지원하지 않는 provider 경로 | 404 | `NOT_FOUND` (Authorization 헤더 유무와 관계없음) |
 | 서버가 Google/Apple 키를 못 가져옴 | 500 | `INTERNAL_ERROR` (`retryable: true`, 잠시 후 재시도) |
 
 사용자가 소셜 로그인을 **취소**하면 서버를 호출하지 말고 로그인 화면에 머문다. 실패를 성공처럼 표시하지 않는다.
@@ -102,8 +102,17 @@ POST /auth/logout
 Authorization: Bearer <access_token>
 ```
 
-- 응답 204, 본문 없음. 현재 기기 세션만 끝나고 계정·매장 소속·다른 기기 로그인은 유지된다.
+- 응답 204, 본문 없음(본문 없는 성공은 모든 API에서 204로 통일). 현재 기기 세션만 끝나고 계정·매장 소속·다른 기기 로그인은 유지된다.
 - 응답 후 저장한 access_token을 삭제하고 CO-01 로그인 화면으로 이동한다.
+
+## 6-1. 약관 동의 (CO-02 / CO-03)
+
+- `GET /consent-documents`의 `body_reference`는 **약관 본문 URL**(https 절대 경로)이다. CO-03에서 이 URL의 본문을 보여준다.
+  보기·닫기만으로는 동의가 저장되지 않는다.
+- `POST /me/consents`의 `agreements`에 빠진 선택 약관은 서버가 **"동의 안 함"으로 기록**한다.
+  필수 약관이 빠지거나 `agreed: false`면 422 `VALIDATION_FAILED`(`field`: `agreements[document_id=N]`).
+- 이미 지난 가입 단계를 다시 저장하면 409 `ONBOARDING_STAGE_CONFLICT`(`current_state`에 현재 단계).
+  `GET /me`로 다시 조회해 `next_screen`으로 이동한다.
 
 ## 7. 토큰 보관
 

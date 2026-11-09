@@ -18,8 +18,8 @@ class ConsentDocumentSeedTest {
                 .extracting(ConsentDocument::getKind, ConsentDocument::getVersion, ConsentDocument::isRequired,
                         ConsentDocument::getBodyReference)
                 .containsExactlyInAnyOrder(
-                        tuple("TERMS_OF_SERVICE", 1, true, "TBD"),
-                        tuple("PRIVACY_POLICY", 1, true, "TBD"),
-                        tuple("MARKETING", 1, false, "TBD"));
+                        tuple("TERMS_OF_SERVICE", 1, true, "https://example.com/baton/terms/terms-of-service/v1"),
+                        tuple("PRIVACY_POLICY", 1, true, "https://example.com/baton/terms/privacy-policy/v1"),
+                        tuple("MARKETING", 1, false, "https://example.com/baton/terms/marketing/v1"));
     }
 }

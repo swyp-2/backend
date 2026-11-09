@@ -136,8 +136,27 @@ class SocialCompleteApiTest {
     }
 
     @Test
-    void 지원하지_않는_제공자는_401() throws Exception {
+    void 지원하지_않는_제공자는_404() throws Exception {
         authApi.complete("kakao", FakeSocialTokenVerifier.idTokenFor(newSubject()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void 지원하지_않는_제공자는_유효한_토큰이_붙어_와도_404() throws Exception {
+        String accessToken = authApi.login(newSubject()).get("access_token").asString();
+
+        mockMvc.perform(post("/auth/kakao/complete")
+                        .header("Authorization", AuthApi.bearer(accessToken))
+                        .contentType("application/json")
+                        .content("{\"id_token\":\"" + FakeSocialTokenVerifier.idTokenFor(newSubject()) + "\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void 인증_API가_아닌_auth_경로는_여전히_인증이_필요하다() throws Exception {
+        mockMvc.perform(post("/auth/kakao/other"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error.code").value("UNAUTHENTICATED"));
     }
