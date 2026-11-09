@@ -1,0 +1,6 @@
+-- POST /stores(매장 생성)의 중복 제출 방지용 멱등성 scope 추가. B 소유 테이블이라 B 검토 필요.
+ALTER TABLE idempotency_records DROP CONSTRAINT idempotency_records_scope_ck;
+ALTER TABLE idempotency_records ADD CONSTRAINT idempotency_records_scope_ck CHECK (scope IN (
+    'SUBSTITUTE_REQUEST_CREATE', 'SUBSTITUTE_REQUEST_ACCEPT', 'SUBSTITUTE_REQUEST_REJECT',
+    'SUBSTITUTE_REQUEST_CANCEL', 'SUBSTITUTE_REQUEST_WITHDRAW', 'SUBSTITUTE_REQUEST_APPROVE',
+    'SUBSTITUTE_REQUEST_FINAL_REJECT', 'SHIFT_BATCH_CREATE', 'STORE_CREATE'));
