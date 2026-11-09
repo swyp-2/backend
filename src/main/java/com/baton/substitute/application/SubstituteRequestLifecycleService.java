@@ -2,7 +2,10 @@ package com.baton.substitute.application;
 
 import com.baton.integration.ActiveRequestSummary;
 import com.baton.integration.SubstituteRequestLifecycle;
+import com.baton.substitute.domain.SubstituteRequestRepository;
+import com.baton.substitute.domain.SubstituteStatus;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,11 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * {@link SubstituteRequestLifecycle} 구현.
  *
- * <p>대타 요청 기능이 아직 없어 처리할 요청이 항상 0건인 상태의 동작을 한다
- * (종료·정리할 것 없음, 조회 결과 없음). 대타 요청 구현 시 이 클래스를 채운다.
+ * <p>findActiveByShift는 구현됨. 종료·정리·파기는 상태 전이 API 작업에서 채운다(지금은 아무것도 하지 않음).
  */
 @Service
+@RequiredArgsConstructor
 public class SubstituteRequestLifecycleService implements SubstituteRequestLifecycle {
+
+    private final SubstituteRequestRepository requestRepository;
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -30,7 +35,10 @@ public class SubstituteRequestLifecycleService implements SubstituteRequestLifec
     @Override
     @Transactional(readOnly = true)
     public Optional<ActiveRequestSummary> findActiveByShift(long shiftId, long viewerMembershipId) {
-        return Optional.empty();
+        return requestRepository.findFirstByShiftIdAndStatusIn(shiftId, SubstituteStatus.ACTIVE)
+                .map(request -> new ActiveRequestSummary(request.getId(), request.getStatus().name(),
+                        request.isRequester(viewerMembershipId),
+                        request.getStatus() == SubstituteStatus.PENDING_MANAGER));
     }
 
     @Override

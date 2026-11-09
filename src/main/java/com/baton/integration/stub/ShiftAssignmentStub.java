@@ -41,7 +41,21 @@ public class ShiftAssignmentStub implements ShiftAssignment {
     @Override
     @Transactional(readOnly = true)
     public ShiftSnapshot getSnapshot(long shiftId) {
+        return toSnapshot(entityManager.find(Shift.class, shiftId));
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ShiftSnapshot lockSnapshot(long shiftId) {
         Shift shift = entityManager.find(Shift.class, shiftId);
+        if (shift != null) {
+            // 같은 트랜잭션에서 getSnapshot으로 이미 읽은 엔티티여도 잠금과 함께 최신 값으로 다시 읽는다
+            entityManager.refresh(shift, LockModeType.PESSIMISTIC_WRITE);
+        }
+        return toSnapshot(shift);
+    }
+
+    private static ShiftSnapshot toSnapshot(Shift shift) {
         if (shift == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
