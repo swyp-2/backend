@@ -62,3 +62,41 @@ A가 구현, B가 호출:
         String displayNameOf(long membershipId);
     }
     public record ActiveMembership(long membershipId, long storeId, long userId, String role) {}
+## B 데이터 모델: 대타·알림 (V202611092000__b_substitute_notification.sql)
+
+### 테이블
+| 테이블 | 용도 | 주요 제약 |
+| --- | --- | --- |
+| substitute_requests | 대타 요청 1건. 원본 근무 스냅샷(source_starts_at/ends_at/version) 보관 | 근무당 진행 중(WAITING/PENDING_MANAGER) 1건 부분 유니크, 요청자·후보는 같은 매장 소속(복합 FK), @Version |
+| request_recipients | 지정 대상. response = PENDING/ACCEPTED/DECLINED/UNAVAILABLE | (request_id, target_membership_id) 유니크 |
+| request_events | 진행 기록(요청·수락·거절·취소·철회·승인·만료·삭제·소속 해제) | 추가만 함. 시스템 처리면 actor NULL |
+| notifications | 앱 내부 알림(이벤트 × 수신자) | (event_id, recipient_membership_id) 유니크, expires_at = created_at + 168시간 |
+
+PK는 A와 같은 방식(테이블별 시퀀스, INCREMENT 50).
+
+### 요청 상태와 종료 사유
+- 진행 중: WAITING, PENDING_MANAGER / 종료: APPROVED, REJECTED, ALL_DECLINED, CANCELLED, WITHDRAWN, EXPIRED,
+  CANCELLED_SOURCE_CHANGED. 종료 상태는 다시 열지 않는다
+- terminal_reason은 사용자 행동이 아닌 종료에만 둔다
+
+| 사건 | status | terminal_reason |
+| --- | --- | --- |
+| 근무 삭제 | CANCELLED_SOURCE_CHANGED | SHIFT_DELETED |
+| 요청자 소속 해제 | CANCELLED | REQUESTER_LEFT |
+| 승인 대기 후보 소속 해제 | WITHDRAWN | CANDIDATE_LEFT |
+| 응답 가능 대상 0명 | CANCELLED | NO_ACTIVE_TARGET |
+
+근무 삭제 표기는 정책서(CANCELLED_SOURCE_CHANGED)와 기능명세서(SOURCE_CHANGED + 삭제 사유)가 달라
+"상태 CANCELLED_SOURCE_CHANGED + 사유 SHIFT_DELETED"로 정했다 (2026-11-09, B).
+
+### 기타 결정
+- 후보(candidate_membership_id)는 종료 후에도 지우지 않는다. 직전 후보에게 결과 알림을 보내고 진행 기록에 쓰기 위해서다
+- 알림에는 store_id를 두지 않는다 (수신자 소속에서 알 수 있음)
+- 탈퇴해도 요청·이벤트의 membership_id는 남긴다. A가 memberships.user_id를 비워 개인과의 연결이 끊어지기 때문이다.
+  anonymizeFor는 본인이 받은 알림만 삭제한다 → **A 확인 필요**
+
+### ShiftAssignment 임시 구현 (com.baton.integration.stub)
+- A 구현이 없을 때만 등록된다 (IntegrationStubConfig의 @Bean @ConditionalOnMissingBean).
+  A가 ShiftAssignment 구현 빈을 추가하면 자동으로 빠지므로 스텁을 지우지 않아도 된다
+- getSnapshot: Shift 조회 / reassign: 근무 행 비관적 잠금 → 버전 비교 → Shift.reassign()
+- 실제 구현과의 차이: shift_events(REASSIGNED)를 남기지 않는다. A 구현에서 남겨 주어야 한다
