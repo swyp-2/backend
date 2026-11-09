@@ -18,6 +18,23 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
     List<Membership> findByStoreIdAndStateAndRoleAndIdNotOrderByIdAsc(Long storeId, MembershipState state, Role role,
                                                                        Long excludeId);
 
+    long countByStoreIdAndState(Long storeId, MembershipState state);
+
+    @Query("""
+            select new com.baton.store.domain.ColorUsage(m.personalColor, count(m))
+            from Membership m
+            where m.storeId = :storeId and m.state = com.baton.store.domain.MembershipState.ACTIVE
+            group by m.personalColor
+            """)
+    List<ColorUsage> countActiveColorUsage(@Param("storeId") Long storeId);
+
+    @Query("""
+            select new com.baton.store.domain.MemberRow(m.id, m.userId, u.displayName, m.role, m.personalColor)
+            from Membership m join User u on u.id = m.userId
+            where m.storeId = :storeId and m.state = com.baton.store.domain.MembershipState.ACTIVE
+            """)
+    List<MemberRow> findActiveMemberRows(@Param("storeId") Long storeId);
+
     /** SELECT ... FOR UPDATE. 잠금 순서: membership → shift → substitute_request. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Membership m where m.id = :id and m.state = com.baton.store.domain.MembershipState.ACTIVE")
