@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    image: baton-api:latest
+    container_name: baton-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      JAVA_TOOL_OPTIONS: "-Xms256m -Xmx768m -Duser.timezone=UTC"
+    ports:
+      - "127.0.0.1:8080:8080"   # 외부 노출 X, Nginx만 접근
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }

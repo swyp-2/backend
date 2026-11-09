@@ -40,6 +40,7 @@ public class SecurityConfig {
 
     private static final String[] DOC_PATHS = {
             "/health",
+            "/actuator/health",
             "/swagger-ui.html",
             "/swagger-ui/**",
             "/v3/api-docs/**",

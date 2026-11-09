@@ -1,9 +1,30 @@
-# 접속 정보와 비밀 값은 전부 환경변수로 주입한다. 이 파일에 값을 쓰지 말 것.
+# 접속 정보와 비밀 값은 전부 환경변수(.env)로 주입한다. 이 파일에 값을 쓰지 말 것.
+# JPA(ddl-auto: validate, open-in-view: false, time_zone: UTC)와 Flyway 설정은 application.yml을 따른다.
 spring:
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
+    # RDS(PG 15+)는 SSL 접속을 강제하므로 sslmode=require
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}?sslmode=require
+    username: ${DB_USER}
     password: ${DB_PASSWORD}
+
+server:
+  # Nginx 뒤에서 X-Forwarded-* 헤더로 https URL을 인식 (Swagger 등)
+  forward-headers-strategy: framework
+
+springdoc:
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
 
 baton:
   auth:

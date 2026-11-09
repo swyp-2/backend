@@ -1,0 +1,14 @@
+# 비밀 값이 이미지에 들어가지 않게 한다
+.env
+.env.*
+!.env.example
+# 빌드 산출물·IDE·문서는 빌드 컨텍스트에서 제외
+.git
+.gradle
+build
+.idea
+.vscode
+*.iml
+out
+docs
+*.log
