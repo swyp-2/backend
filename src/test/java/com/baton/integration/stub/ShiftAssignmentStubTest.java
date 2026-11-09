@@ -1,0 +1,125 @@
+package com.baton.integration.stub;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.baton.common.BusinessException;
+import com.baton.common.ErrorCode;
+import com.baton.integration.ShiftAssignment;
+import com.baton.integration.ShiftSnapshot;
+import com.baton.member.domain.Role;
+import com.baton.member.domain.User;
+import com.baton.member.domain.UserRepository;
+import com.baton.shift.domain.Shift;
+import com.baton.shift.domain.ShiftRepository;
+import com.baton.store.domain.Membership;
+import com.baton.store.domain.MembershipRepository;
+import com.baton.store.domain.Store;
+import com.baton.store.domain.StoreRepository;
+import com.baton.support.IntegrationTest;
+import java.time.Duration;
+import java.time.Instant;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/**
+ * A 구현이 없을 때 등록되는 ShiftAssignment 임시 구현의 계약 확인.
+ */
+@IntegrationTest
+class ShiftAssignmentStubTest {
+
+    private static final Instant NOW = Instant.parse("2026-11-09T03:00:00Z");
+    private static final Instant START = NOW.plus(Duration.ofDays(1));
+    private static final Instant END = START.plus(Duration.ofHours(8));
+
+    @Autowired ShiftAssignment shiftAssignment;
+    @Autowired UserRepository userRepository;
+    @Autowired StoreRepository storeRepository;
+    @Autowired MembershipRepository membershipRepository;
+    @Autowired ShiftRepository shiftRepository;
+    @Autowired TransactionTemplate transactionTemplate;
+
+    private Long storeId;
+    private Long fromId;
+    private Long toId;
+    private Long shiftId;
+
+    @BeforeEach
+    void setUp() {
+        storeId = storeRepository.saveAndFlush(Store.open("스텁매장", NOW)).getId();
+        fromId = newMember();
+        toId = newMember();
+        shiftId = shiftRepository.saveAndFlush(Shift.schedule(storeId, fromId, START, END, NOW)).getId();
+    }
+
+    @Test
+    void A_구현이_없으면_스텁이_주입된다() {
+        assertThat(shiftAssignment).isInstanceOf(ShiftAssignmentStub.class);
+    }
+
+    @Test
+    void 스냅샷은_현재_근무_상태를_돌려준다() {
+        ShiftSnapshot snapshot = shiftAssignment.getSnapshot(shiftId);
+
+        assertThat(snapshot).isEqualTo(new ShiftSnapshot(shiftId, storeId, fromId, START, END, 0L, false));
+    }
+
+    @Test
+    void 삭제된_근무도_deleted_true로_돌려준다() {
+        Shift shift = shiftRepository.findById(shiftId).orElseThrow();
+        shift.delete(NOW);
+        shiftRepository.saveAndFlush(shift);
+
+        ShiftSnapshot snapshot = shiftAssignment.getSnapshot(shiftId);
+
+        assertThat(snapshot.deleted()).isTrue();
+        assertThat(snapshot.version()).isEqualTo(1L);
+    }
+
+    @Test
+    void 없는_근무는_NOT_FOUND() {
+        assertError(() -> shiftAssignment.getSnapshot(Long.MAX_VALUE), ErrorCode.NOT_FOUND);
+    }
+
+    @Test
+    void 담당자를_바꾸고_버전을_올린다() {
+        transactionTemplate.executeWithoutResult(status -> shiftAssignment.reassign(shiftId, fromId, toId, 0L));
+
+        ShiftSnapshot snapshot = shiftAssignment.getSnapshot(shiftId);
+        assertThat(snapshot.assigneeMembershipId()).isEqualTo(toId);
+        assertThat(snapshot.version()).isEqualTo(1L);
+    }
+
+    @Test
+    void 버전이_다르면_SHIFT_STATE_CONFLICT() {
+        assertError(() -> transactionTemplate.executeWithoutResult(
+                status -> shiftAssignment.reassign(shiftId, fromId, toId, 5L)), ErrorCode.SHIFT_STATE_CONFLICT);
+        assertThat(shiftAssignment.getSnapshot(shiftId).assigneeMembershipId()).isEqualTo(fromId);
+    }
+
+    @Test
+    void 현재_담당자가_from이_아니면_SHIFT_STATE_CONFLICT() {
+        assertError(() -> transactionTemplate.executeWithoutResult(
+                status -> shiftAssignment.reassign(shiftId, toId, fromId, 0L)), ErrorCode.SHIFT_STATE_CONFLICT);
+    }
+
+    @Test
+    void 호출자_트랜잭션_없이_reassign하면_예외() {
+        assertThatThrownBy(() -> shiftAssignment.reassign(shiftId, fromId, toId, 0L))
+                .isInstanceOf(IllegalTransactionStateException.class);
+    }
+
+    private Long newMember() {
+        Long userId = userRepository.saveAndFlush(User.signUp()).getId();
+        return membershipRepository.saveAndFlush(Membership.join(storeId, userId, Role.CREW, "#112233", NOW)).getId();
+    }
+
+    private static void assertError(ThrowingCallable call, ErrorCode code) {
+        assertThatThrownBy(call).isInstanceOfSatisfying(BusinessException.class,
+                e -> assertThat(e.getErrorCode()).isEqualTo(code));
+    }
+}
