@@ -30,4 +30,12 @@ public interface ShiftAssignment {
      * 없는 근무면 BusinessException(NOT_FOUND).
      */
     ShiftSnapshot getSnapshot(long shiftId);
+
+    /**
+     * {@link #getSnapshot}과 같지만 근무 행을 잠근다(SELECT ... FOR UPDATE). 호출자 트랜잭션 안에서만 호출한다.
+     * 대타 요청 생성이 근무 삭제와 동시에 일어나도, 삭제가 먼저면 deleted=true를 보고
+     * 생성이 먼저면 삭제 쪽이 새 요청을 보고 종료하도록 순서를 맞춘다. (2026-11-09 B 추가)
+     * 잠금 순서: membership → shift → substitute_request. 없는 근무면 BusinessException(NOT_FOUND).
+     */
+    ShiftSnapshot lockSnapshot(long shiftId);
 }

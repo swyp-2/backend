@@ -12,7 +12,8 @@ DELETE /shifts/{shift_id}, POST /stores/{store_id}/leave, DELETE /me
 GET /me/notification-indicator, 만료·알림 정리 스케줄러, common(응답·에러·멱등성), Docker·EC2 배포
 
 ## 공통 규칙
-- 응답: {"data": ..., "meta": {"server_time"}} / 에러: {"error": {"code","message","field_errors","retryable"}, "current_state"?}
+- 응답: {"data": ..., "meta": {"server_time"}} / 에러: {"error": {"code","message","field_errors","retryable"}, "current_state"?, "existing_request_id"?}
+  - existing_request_id: ACTIVE_REQUEST_EXISTS(409)일 때만 나오는 진행 중 요청 id (2026-11-09 B 추가). 그 밖에는 키 자체가 없다
 - 응답 본문이 없는 성공은 204 No Content (본문·meta 없음). 예: POST /auth/logout
 - 계정당 활성 매장 소속은 1개다 (DB 부분 유니크 memberships_user_active_uk). 이미 활성 소속이 있으면
   매장 생성·참여는 409 ALREADY_IN_STORE
@@ -47,6 +48,9 @@ A가 구현, B가 호출:
         void reassign(long shiftId, long fromMembershipId, long toMembershipId, long expectedVersion);
         // 요청 생성 검증과 스냅샷용
         ShiftSnapshot getSnapshot(long shiftId);
+        // [2026-11-09 B 추가] getSnapshot + 근무 행 잠금(FOR UPDATE). 호출자 트랜잭션 필수.
+        // 대타 요청 생성이 근무 삭제와 동시에 일어날 때 순서를 맞추기 위함. 없는 근무면 NOT_FOUND
+        ShiftSnapshot lockSnapshot(long shiftId);
     }
     public record ShiftSnapshot(long shiftId, long storeId, long assigneeMembershipId,
                                 Instant startsAt, Instant endsAt, long version, boolean deleted) {}
@@ -54,6 +58,9 @@ A가 구현, B가 호출:
     public interface MembershipQuery {
         // 활성 소속이 아니면 BusinessException(FORBIDDEN)
         ActiveMembership requireActive(long userId, long storeId);
+        // [2026-11-09 B 추가] 사용자의 현재 활성 소속(MVP는 1개). 없으면 empty.
+        // 경로에 매장 id가 없는 GET /me/substitute-requests용. A의 MembershipGuard에 이미 같은 메서드가 있어 추가 구현 없음
+        Optional<ActiveMembership> findActiveByUser(long userId);
         // 잠금 버전. 승인·수락 시 후보 소속 재확인용
         Optional<ActiveMembership> lockActiveById(long membershipId);
         // 대타 후보: 같은 매장 ACTIVE CREW, exclude 제외
@@ -100,3 +107,50 @@ PK는 A와 같은 방식(테이블별 시퀀스, INCREMENT 50).
   A가 ShiftAssignment 구현 빈을 추가하면 자동으로 빠지므로 스텁을 지우지 않아도 된다
 - getSnapshot: Shift 조회 / reassign: 근무 행 비관적 잠금 → 버전 비교 → Shift.reassign()
 - 실제 구현과의 차이: shift_events(REASSIGNED)를 남기지 않는다. A 구현에서 남겨 주어야 한다
+
+## B API: 대타 요청 생성·조회 (2026-11-09)
+
+| 메서드·경로 | 누가 | 응답 data |
+| --- | --- | --- |
+| POST /substitute-requests (Idempotency-Key 필수) | 근무 담당 크루원 | 만든 요청의 상세(아래 상세와 같음) |
+| GET /substitute-requests/{id} | 같은 매장의 요청자·지정 대상·매니저 | 상세 |
+| GET /me/substitute-requests?box=sent\|received&cursor= | 크루원(현재 활성 소속 기준) | {items, next_cursor, has_more} |
+
+요청 본문: `{"shift_id": 1, "target_membership_ids": [2, 3]}`
+
+상세 필드: id, status, terminal_reason, version, created_at, closed_at,
+shift{shift_id, starts_at, ends_at, deleted}, requester{membership_id, display_name}, candidate(없으면 null),
+my_relation(REQUESTER/CANDIDATE/TARGET/MANAGER), recipients[{membership_id, display_name, response}],
+allowed_actions(cancel/accept/reject/withdraw/approve/final_reject), events[{kind, actor(시스템이면 null), occurred_at}]
+- shift의 시각은 요청 생성 시점 스냅샷. 근무가 삭제되면 deleted=true ("삭제 전 정보"로 표시)
+- recipients는 요청자·매니저에게 전체, 지정 대상·후보에게는 본인 것만
+- allowed_actions는 표시용. 종료됐거나 근무 시작 시각이 지난 요청은 빈 배열. 실제 변경 API가 다시 검사한다
+
+목록 항목: id, status, terminal_reason, shift{shift_id, starts_at, ends_at, deleted=null}, requester, candidate,
+my_response(받은 요청만, 보낸 요청은 null), created_at. 정렬은 생성 시각·id 내림차순 20개, next_cursor는 불투명 문자열
+
+생성 에러
+| 상황 | 에러 |
+| --- | --- |
+| 매장 소속 아님·매니저·본인 담당 근무 아님 | 403 FORBIDDEN |
+| 없는 근무 | 404 NOT_FOUND |
+| 삭제된 근무 | 409 SHIFT_STATE_CONFLICT |
+| 이미 시작한 근무 | 409 REQUEST_EXPIRED |
+| 대상 0명·중복·본인·매니저·다른 매장 | 422 VALIDATION_FAILED (field: target_membership_ids) |
+| 같은 근무에 진행 중 요청 있음 | 409 ACTIVE_REQUEST_EXISTS + existing_request_id |
+
+조회 에러: 요청 없음 404 / 관계없는 사람·다른 매장 403 / 매니저·소속 없음의 목록 조회 403 / box·cursor 형식 오류 422
+
+생성 트랜잭션의 잠금 순서: idempotency_records → 요청자·대상 membership(id 오름차순, lockActiveById) →
+shift(lockSnapshot) → substitute_request. 소속을 잠그므로 A의 나가기·탈퇴와 동시에 일어나도 정리 대상에서 빠지지 않는다.
+
+A에게 영향: Lifecycle.findActiveByShift가 실제 값을 돌려준다 (근무 상세 SH-01/02에서 사용).
+
+## Swagger(OpenAPI) 문서 (2026-11-09 B)
+- 주소: /swagger-ui.html (JSON은 /v3/api-docs)
+- **필드명 수정**: 그동안 문서의 필드명이 camelCase(storeId 등)로 나왔지만 실제 응답은 snake_case였다.
+  springdoc의 스키마 생성기(swagger-core)가 Jackson 2를 따로 써서 Spring Boot의 Jackson 3 설정이 전달되지 않기 때문이다.
+  config/OpenApiConfig에 snake_case ModelResolver 빈을 추가해 A의 API 문서도 함께 맞췄다 → **A 확인 필요**
+- 대타 요청 API는 @Tag("대타 요청"), @Operation(요약·에러 코드), 필수 헤더, 고유 스키마 이름
+  (SubstituteRequestDetail 등)을 달았다. 레코드 이름이 일반적이면(Detail, Page) 다른 기능과 문서 스키마가 겹치므로
+  @Schema(name = ...)로 고유하게 지정하는 것을 권장

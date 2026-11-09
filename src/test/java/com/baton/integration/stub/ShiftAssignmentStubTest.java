@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -105,6 +106,37 @@ class ShiftAssignmentStubTest {
     void 현재_담당자가_from이_아니면_SHIFT_STATE_CONFLICT() {
         assertError(() -> transactionTemplate.executeWithoutResult(
                 status -> shiftAssignment.reassign(shiftId, toId, fromId, 0L)), ErrorCode.SHIFT_STATE_CONFLICT);
+    }
+
+    @Test
+    void 잠금_스냅샷은_같은_트랜잭션에서_먼저_읽은_뒤에도_최신_값을_돌려준다() {
+        ShiftSnapshot locked = transactionTemplate.execute(status -> {
+            shiftAssignment.getSnapshot(shiftId);
+            // 그 사이 다른 트랜잭션에서 근무 삭제가 커밋된 상황
+            TransactionTemplate requiresNew = new TransactionTemplate(transactionTemplate.getTransactionManager());
+            requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            requiresNew.executeWithoutResult(inner -> {
+                Shift shift = shiftRepository.findById(shiftId).orElseThrow();
+                shift.delete(NOW);
+                shiftRepository.saveAndFlush(shift);
+            });
+            return shiftAssignment.lockSnapshot(shiftId);
+        });
+
+        assertThat(locked.deleted()).isTrue();
+        assertThat(locked.version()).isEqualTo(1L);
+    }
+
+    @Test
+    void 없는_근무를_잠그면_NOT_FOUND() {
+        assertError(() -> transactionTemplate.execute(status -> shiftAssignment.lockSnapshot(Long.MAX_VALUE)),
+                ErrorCode.NOT_FOUND);
+    }
+
+    @Test
+    void 호출자_트랜잭션_없이_lockSnapshot하면_예외() {
+        assertThatThrownBy(() -> shiftAssignment.lockSnapshot(shiftId))
+                .isInstanceOf(IllegalTransactionStateException.class);
     }
 
     @Test
