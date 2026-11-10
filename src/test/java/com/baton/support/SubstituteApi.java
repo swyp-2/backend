@@ -115,6 +115,28 @@ public final class SubstituteApi {
         return data(create(userId, shiftId, targets).andExpect(status().isOk()));
     }
 
+    /**
+     * 상태 전이 호출. action은 경로 마지막 부분(accept, reject, cancel, withdraw, approve, final-reject).
+     * key가 null이면 Idempotency-Key 헤더를 보내지 않는다.
+     */
+    public ResultActions transition(long userId, long requestId, String action, String key) throws Exception {
+        MockHttpServletRequestBuilder request = post("/substitute-requests/{id}/" + action, requestId)
+                .header(TestUserAuthenticationFilter.HEADER, userId);
+        if (key != null) {
+            request.header("Idempotency-Key", key);
+        }
+        return mockMvc.perform(request);
+    }
+
+    public ResultActions transition(long userId, long requestId, String action) throws Exception {
+        return transition(userId, requestId, action, UUID.randomUUID().toString());
+    }
+
+    /** 상태 전이를 호출하고 성공(200) 응답의 상세(data)를 돌려준다. */
+    public JsonNode transitionOk(long userId, long requestId, String action) throws Exception {
+        return data(transition(userId, requestId, action).andExpect(status().isOk()));
+    }
+
     public ResultActions detail(long userId, long requestId) throws Exception {
         return mockMvc.perform(get("/substitute-requests/{id}", requestId)
                 .header(TestUserAuthenticationFilter.HEADER, userId));

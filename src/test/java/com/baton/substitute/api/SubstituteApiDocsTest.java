@@ -74,6 +74,19 @@ class SubstituteApiDocsTest {
         assertThat(docs.get("paths").get("/substitute-requests/{requestId}").get("get")).isNotNull();
     }
 
+    @Test
+    void 상태_전이_API_6개는_필수_헤더와_상세_응답_에러_스키마가_있다() {
+        for (String action : List.of("accept", "reject", "cancel", "withdraw", "approve", "final-reject")) {
+            JsonNode operation = docs.get("paths").get("/substitute-requests/{requestId}/" + action).get("post");
+
+            assertThat(operation.get("tags").get(0).asText()).isEqualTo("대타 요청");
+            assertThat(parameter(operation, "Idempotency-Key").get("required").asBoolean()).isTrue();
+            assertThat(operation.get("responses").get("200").toString()).contains("SubstituteRequestDetail");
+            assertThat(operation.get("responses").get("409").toString()).contains("ErrorResponse");
+            assertThat(operation.has("requestBody")).isFalse();
+        }
+    }
+
     private List<String> propertyNames(String schema) {
         List<String> names = new ArrayList<>();
         docs.get("components").get("schemas").get(schema).get("properties").propertyNames().forEach(names::add);
