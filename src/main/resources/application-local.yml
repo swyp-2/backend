@@ -23,5 +23,8 @@ baton:
       client-ids: local-google-client-id
     apple:
       client-ids: local.apple.bundle.id
+  shift:
+    # 로컬 전용 키. 운영 값과 절대 공유하지 말 것
+    preview-secret: local-only-baton-shift-preview-secret-0123456789
   cors:
     allowed-origins: http://localhost:3000,http://localhost:5173

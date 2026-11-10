@@ -154,3 +154,22 @@ A에게 영향: Lifecycle.findActiveByShift가 실제 값을 돌려준다 (근�
 - 대타 요청 API는 @Tag("대타 요청"), @Operation(요약·에러 코드), 필수 헤더, 고유 스키마 이름
   (SubstituteRequestDetail 등)을 달았다. 레코드 이름이 일반적이면(Detail, Page) 다른 기능과 문서 스키마가 겹치므로
   @Schema(name = ...)로 고유하게 지정하는 것을 권장
+
+## A API: 근무 일괄 등록 (2026-11-10 A)
+
+| 메서드·경로 | 누가 | 응답 data |
+| --- | --- | --- |
+| POST /shift-batches/preview | 본문 store_id 매장의 매니저 | {preview_token, create_count, duplicate_count, total_count, items[{membership_id, display_name, local_date, starts_at, ends_at, duplicate}]} |
+| POST /shift-batches (Idempotency-Key 필수) | 같은 매니저 | {created_count, duplicate_count, shift_ids[]} (실제로 저장한 건만) |
+
+요청 본문: `{"store_id", "assignee_membership_ids", "starts_at", "ends_at", "repeat": {"enabled", "start_date", "end_date", "weekdays"}}`,
+최종 등록은 여기에 `"preview_token"`을 더한다(미리보기와 같은 입력 그대로).
+- 미리보기는 DB에 쓰지 않는다. preview_token은 서버 서명 불투명 문자열(30분, DB 저장 없음)
+- starts_at·ends_at은 분 단위만(초·나노초가 있으면 422)
+- 전부 중복이면 미리보기는 200 + create_count 0, 최종 등록은 422 VALIDATION_FAILED("모두 이미 등록된 근무예요.")
+- 409 PREVIEW_STALE: 토큰 만료·변조, 입력이 미리보기와 다름, 미리보기 이후 중복 상태가 바뀜(누가 그사이 같은 근무를 등록·삭제).
+  입력은 유지하고 미리보기를 다시 호출한다. 저장은 전부 아니면 0건
+- 403: 매니저가 아님 / 422: 다른 매장·나간 구성원 포함, 입력 오류, 토큰 누락
+- 최종 등록 트랜잭션 잠금 순서: idempotency_records → 담당 membership(FOR SHARE, id 오름차순) → shifts(부분 유니크).
+  나가기·탈퇴의 membership FOR UPDATE와 직렬화된다
+- 등록한 근무마다 shift_events(CREATED, actor = 매니저 membership, after_value = {assignee_membership_id, starts_at, ends_at})
