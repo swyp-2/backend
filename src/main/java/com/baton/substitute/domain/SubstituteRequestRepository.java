@@ -44,6 +44,34 @@ public interface SubstituteRequestRepository extends JpaRepository<SubstituteReq
             """)
     List<Long> findExpirableIds(@Param("now") Instant now, @Param("afterId") long afterId, Limit limit);
 
+    /**
+     * 소속 해제 정리: 그 소속이 요청자·후보·지정 대상인 진행 중 요청 id(id 오름차순 = 잠금 순서).
+     * 잠그지 않는다. 호출자가 한 건씩 findByIdForUpdate로 잠근 뒤 상태를 다시 확인한다.
+     */
+    @Query("""
+            select r.id from SubstituteRequest r
+            where r.status in (com.baton.substitute.domain.SubstituteStatus.WAITING,
+                               com.baton.substitute.domain.SubstituteStatus.PENDING_MANAGER)
+              and (r.requesterMembershipId = :membershipId
+                   or r.candidateMembershipId = :membershipId
+                   or exists (select 1 from RequestRecipient x
+                              where x.requestId = r.id and x.targetMembershipId = :membershipId))
+            order by r.id
+            """)
+    List<Long> findActiveIdsInvolving(@Param("membershipId") long membershipId);
+
+    /**
+     * 근무 삭제: 그 근무의 진행 중 요청 id(부분 유니크로 최대 1건). 엔티티를 영속성 컨텍스트에 올리지 않아
+     * 뒤의 findByIdForUpdate가 최신 값을 읽는다.
+     */
+    @Query("""
+            select r.id from SubstituteRequest r
+            where r.shiftId = :shiftId
+              and r.status in (com.baton.substitute.domain.SubstituteStatus.WAITING,
+                               com.baton.substitute.domain.SubstituteStatus.PENDING_MANAGER)
+            """)
+    Optional<Long> findActiveIdByShiftId(@Param("shiftId") long shiftId);
+
     // 보낸 요청: 생성 시각·ID 내림차순 커서 ---------------------------------
 
     @Query("""

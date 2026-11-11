@@ -110,11 +110,9 @@ PK는 A와 같은 방식(테이블별 시퀀스, INCREMENT 50).
 - 탈퇴해도 요청·이벤트의 membership_id는 남긴다. A가 memberships.user_id를 비워 개인과의 연결이 끊어지기 때문이다.
   anonymizeFor는 본인이 받은 알림만 삭제한다 → **A 확인 필요**
 
-### ShiftAssignment 임시 구현 (com.baton.integration.stub)
-- A 구현이 없을 때만 등록된다 (IntegrationStubConfig의 @Bean @ConditionalOnMissingBean).
-  A가 ShiftAssignment 구현 빈을 추가하면 자동으로 빠지므로 스텁을 지우지 않아도 된다
-- getSnapshot: Shift 조회 / reassign: 근무 행 비관적 잠금 → 버전 비교 → Shift.reassign()
-- 실제 구현과의 차이: shift_events(REASSIGNED)를 남기지 않는다. A 구현에서 남겨 주어야 한다
+### ShiftAssignment 임시 구현 (삭제됨)
+- 2026-11-11 B: A의 실제 구현(ShiftAssignmentService)이 들어와 ShiftAssignmentStub과 그 테스트를 삭제했다.
+  StoreManagerQuery 스텁은 A 구현이 아직 없어 남겨 둔다
 
 ## B API: 대타 요청 생성·조회 (2026-11-09)
 
@@ -299,6 +297,45 @@ integration.stub.NoopSubstituteRequestLifecycle: B 구현이 없을 때만 등�
   노출되지 않는다. 읽음·확인 UPDATE와 같이 id 오름차순으로 잠근 뒤 지운다
 - 설정: baton.scheduling.enabled=false면 스케줄러 전체가 꺼진다(기본 켜짐). test 프로필은 false이고,
   테스트는 job 메서드를 직접 호출한다(실제 시각에 job이 돌면서 MutableClock 테스트 데이터를 바꾸지 않게)
+
+## B 구현: SubstituteRequestLifecycle 정리·파기 (2026-11-11 B)
+
+| 메서드 | 처리 | 진행 기록 | 알림 |
+| --- | --- | --- | --- |
+| closeBySourceDeleted(shiftId, actor) | 진행 중 요청 → CANCELLED_SOURCE_CHANGED(SHIFT_DELETED). 종료한 요청 id 반환, 없으면 empty | SOURCE_DELETED, actor = 삭제한 매니저 | 없음 |
+| cleanupOnMembershipLeave(membershipId) | 아래 표 | 요청이 종료될 때만 MEMBER_LEFT, actor = 떠나는 사람 | 남아 있는 요청자·직전 후보·매니저(떠나는 사람 제외) |
+| anonymizeFor(membershipId) | 그 소속이 받은 알림 전부 삭제 | - | - |
+
+소속 해제 정리 (기능명세서 SUB-10, 정책 D20):
+
+| 떠나는 사람 | 결과 |
+| --- | --- |
+| 요청자 | CANCELLED(REQUESTER_LEFT) |
+| PENDING_MANAGER의 후보 | WITHDRAWN(CANDIDATE_LEFT), 그 지정 대상 행은 UNAVAILABLE |
+| 그 밖의 지정 대상 | 그 대상만 UNAVAILABLE. WAITING에서 미응답 대상이 더 없으면: 거절한 대상이 남았으면 ALL_DECLINED, 모두 응답 불가면 CANCELLED(NO_ACTIVE_TARGET) |
+
+- 남은 대상이 모두 거절한 상태면 ALL_DECLINED로 종료한다(2026-11-11 B 결정). 거절 API의 "미응답 대상이 없으면 ALL_DECLINED"와 같은 규칙
+- 지정 대상만 응답 불가가 되고 요청이 계속되면 진행 기록·알림을 남기지 않는다
+- **A 호출 조건:** 나가기·탈퇴는 떠나는 소속을 FOR UPDATE로 잠근 뒤, 소속을 해제하는 같은 트랜잭션에서
+  cleanupOnMembershipLeave를 호출한다. 그래야 그 사람이 관련된 수락·승인(소속을 먼저 잠금)과 직렬화된다.
+  탈퇴는 이어서 anonymizeFor를 호출한다
+- 잠금: 요청 행만 id 오름차순 FOR UPDATE로 잠그고 다시 확인한다. 다른 사람의 소속은 잠그지 않는다
+  (두 사람이 동시에 나갈 때 서로의 소속을 잠가 교착되지 않게). 알림 수신자의 활성 여부는 잠그지 않고 조회한다
+- 근무 삭제는 A가 근무를 잠근 뒤 호출하므로 같은 근무의 요청 생성(lockSnapshot)과 직렬화된다
+
+**A에게 제안: reassign에 requestId·actorMembershipId 추가** (A 문서의 "B와 합의 필요" 항목, B는 추가 찬성)
+
+    void reassign(long shiftId, long fromMembershipId, long toMembershipId, long expectedVersion,
+                  long requestId, long actorMembershipId);
+
+- shift_events(REASSIGNED)의 request_id·actor_membership_id를 채워 근무 기록만으로 어떤 대타 승인인지 알 수 있게 한다
+- A가 인터페이스·ShiftAssignmentService를 바꾸면 B는 승인 호출부(SubstituteRequestTransitionService.reassign)에서
+  request.getId()와 승인한 매니저 membership을 넘긴다
+
+**A의 "B에게 확인 요청"(아래 나가기·탈퇴 절)에 대한 답 (2026-11-11 B)**
+- cleanupOnMembershipLeave·anonymizeFor는 이 절의 내용대로 구현했다. A의 호출 순서(떠나는 소속 FOR UPDATE → 같은 트랜잭션에서
+  정리, 탈퇴는 이어서 소속마다 anonymizeFor)가 위의 호출 조건과 맞다
+- anonymizeFor는 recipient_membership_id로만 지우므로, user_id를 끊기 전에 호출돼도 후에 호출돼도 결과가 같다
 
 ## A API: 매장 나가기·계정 탈퇴 (2026-11-11 A)
 
