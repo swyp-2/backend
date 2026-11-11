@@ -222,3 +222,31 @@ A에게 영향
 - 최종 등록 트랜잭션 잠금 순서: idempotency_records → 담당 membership(FOR SHARE, id 오름차순) → shifts(부분 유니크).
   나가기·탈퇴의 membership FOR UPDATE와 직렬화된다
 - 등록한 근무마다 shift_events(CREATED, actor = 매니저 membership, after_value = {assignee_membership_id, starts_at, ends_at})
+
+## A API: 근무 삭제 + ShiftAssignment 실제 구현 (2026-11-11 A)
+
+| 메서드·경로 | 누가 | 응답 data |
+| --- | --- | --- |
+| DELETE /shifts/{shift_id}?expected_version={n} | 그 근무 매장의 매니저(과거 근무 포함) | {shift_id, deleted: true, closed_request_id(없으면 null)} |
+
+- 한 트랜잭션: 근무 FOR UPDATE → 상태·버전 확인 → 소프트 삭제(version +1) → shift_events(DELETED, actor = 매니저,
+  before_value = {assignee_membership_id, starts_at, ends_at}) → Lifecycle.closeBySourceDeleted(shiftId, 매니저 membership).
+  B 처리에서 예외가 나면 삭제도 전부 롤백된다
+- 에러: expected_version 누락·형식 오류 422 VALIDATION_FAILED / 매니저 아님·다른 매장 403 / 없는 근무 404 /
+  409 SHIFT_STATE_CONFLICT + current_state ("DELETED": 이미 삭제됨, "CHANGED": 버전·담당자 바뀜)
+- **current_state는 문자열만 담는다.** 409를 받으면 프론트는 최신 근무를 다시 조회한다(정식 동작). DELETED면 상세가 404이므로 날짜 근무표로 돌아간다
+- 권한(403)을 상태(409)보다 먼저 검사한다. 권한 없는 사람에게 근무 상태를 알려 주지 않기 위해서다
+- 반복 등록한 다른 날짜 근무는 독립 행이라 영향이 없다(B04)
+- 멱등 키는 받지 않는다. expected_version으로 재시도·중복 제출이 409가 된다(B20)
+
+ShiftAssignment (com.baton.shift.application.ShiftAssignmentService)
+- 이 빈이 생겨 integration.stub.ShiftAssignmentStub은 더 이상 등록되지 않는다. 스텁 계약 테스트는 스텁을 직접 만들어 유지했다.
+  **스텁 삭제 여부는 B가 결정**
+- reassign: 잠금 순서를 지키려고 to 소속(lockActiveById)을 근무보다 먼저 잠근다(B가 이미 잠갔으면 바로 통과) →
+  근무 FOR UPDATE → 삭제됨(DELETED) / 버전 불일치·현재 담당자 != from·to == from·to가 비활성 또는 다른 매장(CHANGED)이면
+  SHIFT_STATE_CONFLICT → 담당자 변경·flush(version +1) → shift_events(REASSIGNED, before/after = {assignee_membership_id})
+- shifts_identical_live_uk 위반은 감싸지 않고 그대로 던진다
+- REASSIGNED 이벤트의 request_id·actor_membership_id는 인터페이스로 전달되지 않아 NULL이다 → **B와 합의 필요**
+  (필요하면 reassign에 requestId·actorMembershipId 인자 추가)
+
+integration.stub.NoopSubstituteRequestLifecycle: B 구현이 없을 때만 등록되는 빈 구현(IntegrationStubConfig @Bean). 지금은 B 구현이 있어 쓰이지 않는다
