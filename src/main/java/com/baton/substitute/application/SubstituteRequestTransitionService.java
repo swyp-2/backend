@@ -159,11 +159,15 @@ public class SubstituteRequestTransitionService {
     /**
      * 처리 결과 알림 수신자(정책 N05·7절): 요청자 + 후보(현재 또는 사건 직전) + 소속 매니저.
      * 지금 활성 소속인 사람만, 같은 사람은 한 번만. 후보가 없으면 후보 수신자도 없다(다른 지정 대상으로 넓히지 않음).
+     * 행동한 본인은 받지 않는다(2026-11-11 결정: 알림 목록 없이 빨간 점만 쓰므로 본인 행동으로 점을 켜지 않는다.
+     * 기능명세서 NTF-04 "행위자 본인도 포함"과 다름). 매니저가 여럿이면 처리한 매니저만 빠진다.
      *
+     * @param actorMembershipId 이 사건을 일으킨 사람
      * @param activeParties 잠금 조회로 활성이 확인된 요청자·후보 소속 id
      */
-    static Set<Long> resultRecipients(long requesterMembershipId, Long candidateMembershipId,
-                                      Collection<Long> activeParties, Collection<Long> activeManagerIds) {
+    static Set<Long> resultRecipients(long actorMembershipId, long requesterMembershipId,
+                                      Long candidateMembershipId, Collection<Long> activeParties,
+                                      Collection<Long> activeManagerIds) {
         Set<Long> recipients = new LinkedHashSet<>();
         if (activeParties.contains(requesterMembershipId)) {
             recipients.add(requesterMembershipId);
@@ -172,6 +176,7 @@ public class SubstituteRequestTransitionService {
             recipients.add(candidateMembershipId);
         }
         recipients.addAll(activeManagerIds);
+        recipients.remove(actorMembershipId);
         return recipients;
     }
 
@@ -259,8 +264,8 @@ public class SubstituteRequestTransitionService {
         List<Long> managers = storeManagerQuery.findActiveManagers(request.getStoreId()).stream()
                 .map(ActiveMembership::membershipId)
                 .toList();
-        notificationWriter.notify(event, resultRecipients(request.getRequesterMembershipId(),
-                request.getCandidateMembershipId(), ctx.activeParties(), managers));
+        notificationWriter.notify(event, resultRecipients(ctx.actor().membershipId(),
+                request.getRequesterMembershipId(), request.getCandidateMembershipId(), ctx.activeParties(), managers));
         requestRepository.flush();
     }
 
