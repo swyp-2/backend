@@ -279,3 +279,30 @@ ShiftAssignment (com.baton.shift.application.ShiftAssignmentService)
   (필요하면 reassign에 requestId·actorMembershipId 인자 추가)
 
 integration.stub.NoopSubstituteRequestLifecycle: B 구현이 없을 때만 등록되는 빈 구현(IntegrationStubConfig @Bean). 지금은 B 구현이 있어 쓰이지 않는다
+
+## A API: 매장 나가기·계정 탈퇴 (2026-11-11 A)
+
+| 메서드·경로 | 누가 | 응답 |
+| --- | --- | --- |
+| POST /stores/{store_id}/leave | 그 매장의 본인 활성 소속 | 204 |
+| DELETE /me | 본인 | 204 |
+
+- 공통 사전 검사(한 트랜잭션 안): user FOR UPDATE → 본인 활성 membership FOR UPDATE → 끝나지 않은 본인 배정 근무
+  (deleted_at IS NULL AND ends_at > now, 예정 + 진행 중)가 있으면 409 FUTURE_SHIFT_REMAINS, 아무것도 바꾸지 않는다.
+  **current_state 없음**(남은 개수·시각은 본문에 넣지 않는다. 프론트는 내 근무 조회로 확인)
+- 마지막 매니저 특수 처리는 없다(U-02, 분기 위치에 TODO만)
+- 나가기: 사전 검사 → `Lifecycle.cleanupOnMembershipLeave` → membership LEFT → user 단계 STORE_REQUIRED(이름·역할 유지).
+  계정·세션은 유지. 이 매장 활성 소속이 아니면(다른 매장·이미 나감) 403. 재참여는 join으로 **새 membership 행**
+- 탈퇴: 본인 소속 전부(ACTIVE·LEFT) id 오름차순 FOR UPDATE → (활성 소속이 있으면) 사전 검사 + cleanupOnMembershipLeave
+  → 소속마다 `Lifecycle.anonymizeFor(id)` 후 state = WITHDRAWN, user_id = NULL(LEFT였으면 left_at 유지)
+  → idempotency_records(B의 deleteByUserId 호출)·auth_sessions·social_accounts·user_consents 삭제
+  → users: display_name·selected_role NULL, WITHDRAWN, withdrawn_at (행은 개인 연결 없는 톰스톤으로 남긴다)
+- 탈퇴 직후 기존 토큰은 401(세션 없음 + 계정 WITHDRAWN). 같은 소셜 계정으로 다시 로그인하면 새 회원(CONSENT_REQUIRED)
+- B 처리(cleanup·anonymize)에서 예외가 나면 전체 롤백
+- 잠금 순서: user → membership → shift → substitute_request (매장 생성·참여와 같음). B의 lockActiveById·일괄 등록 FOR SHARE와
+  같은 membership 행에서 직렬화된다
+
+B에게 확인 요청
+- `SubstituteRequestLifecycleService.cleanupOnMembershipLeave`·`anonymizeFor`가 아직 빈 구현이다.
+  정책 D05의 "본인 수신 알림 파기"는 anonymizeFor 책임이므로 구현이 필요하다(A는 호출만 한다)
+- anonymizeFor는 A가 user_id를 끊기 **전에** 호출된다(호출 시점에 membership 행은 잠겨 있고 아직 user_id가 있다)

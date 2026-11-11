@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.baton.common.BusinessException;
 import com.baton.common.ErrorCode;
+import java.time.Instant;
 import java.util.function.Consumer;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.Test;
@@ -85,6 +86,33 @@ class UserTest {
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
         assertThat(user.getOnboardingStage()).isEqualTo(OnboardingStage.NAME_REQUIRED);
         assertThat(user.getDisplayName()).isNull();
+    }
+
+    @Test
+    void 탈퇴하면_이름과_역할을_지우고_WITHDRAWN이_된다() {
+        User user = User.signUp();
+        user.agreeConsents();
+        user.setName("김도연");
+        user.selectRole(Role.CREW);
+        Instant now = Instant.parse("2026-11-11T03:00:00Z");
+
+        user.withdraw(now);
+
+        assertThat(user.getDisplayName()).isNull();
+        assertThat(user.getSelectedRole()).isNull();
+        assertThat(user.getAccountState()).isEqualTo(AccountState.WITHDRAWN);
+        assertThat(user.getWithdrawnAt()).isEqualTo(now);
+    }
+
+    @Test
+    void 이미_탈퇴한_계정은_탈퇴_시각을_바꾸지_않는다() {
+        User user = User.signUp();
+        Instant first = Instant.parse("2026-11-11T03:00:00Z");
+        user.withdraw(first);
+
+        user.withdraw(first.plusSeconds(60));
+
+        assertThat(user.getWithdrawnAt()).isEqualTo(first);
     }
 
     private static void assertRejectedExcept(OnboardingStage allowed, Consumer<User> transition) {

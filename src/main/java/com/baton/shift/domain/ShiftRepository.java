@@ -51,4 +51,14 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
 
     @Query(ROW_SELECT + "where s.id = :shiftId and s.deletedAt is null")
     Optional<ShiftRow> findLiveRowById(@Param("shiftId") Long shiftId);
+
+    /**
+     * 나가기·탈퇴 사전 검사: 삭제되지 않았고 아직 끝나지 않은(ends_at > now, 예정 + 진행 중) 본인 배정 근무가 있는지.
+     * shifts_assignee_starts_idx로 담당자 범위를 좁힌다.
+     */
+    @Query("""
+            select count(s) > 0 from Shift s
+            where s.assigneeMembershipId = :membershipId and s.deletedAt is null and s.endsAt > :now
+            """)
+    boolean existsUnfinishedByAssignee(@Param("membershipId") Long membershipId, @Param("now") Instant now);
 }

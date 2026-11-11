@@ -102,6 +102,20 @@ public class User extends BaseTimeEntity {
         onboardingStage = OnboardingStage.STORE_REQUIRED;
     }
 
+    /**
+     * 계정 탈퇴. 이름·선택 역할을 지우고 WITHDRAWN으로 바꾼다. 행은 개인 연결이 없는 톰스톤으로 남는다.
+     * 이미 탈퇴한 계정이면 아무것도 바꾸지 않는다.
+     */
+    public void withdraw(Instant now) {
+        if (accountState == AccountState.WITHDRAWN) {
+            return;
+        }
+        displayName = null;
+        selectedRole = null;
+        accountState = AccountState.WITHDRAWN;
+        withdrawnAt = now;
+    }
+
     private void requireStage(OnboardingStage expected) {
         if (onboardingStage != expected) {
             throw stageConflict();
