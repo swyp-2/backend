@@ -17,6 +17,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @IntegrationTest
 class SubstituteRequestLifecycleContractTest {
 
+    /** 어떤 테이블에도 없는 id. 테스트끼리 DB를 공유하므로 다른 테스트의 데이터를 건드리지 않게 한다. */
+    private static final long NONE = -1L;
+
     @Autowired SubstituteRequestLifecycle lifecycle;
     @Autowired TransactionTemplate transactionTemplate;
 
@@ -27,23 +30,23 @@ class SubstituteRequestLifecycleContractTest {
 
     @Test
     void 트랜잭션_필수_메서드를_트랜잭션_없이_호출하면_예외() {
-        assertThatThrownBy(() -> lifecycle.closeBySourceDeleted(1L, 2L))
+        assertThatThrownBy(() -> lifecycle.closeBySourceDeleted(NONE, NONE))
                 .isInstanceOf(IllegalTransactionStateException.class);
-        assertThatThrownBy(() -> lifecycle.cleanupOnMembershipLeave(1L))
+        assertThatThrownBy(() -> lifecycle.cleanupOnMembershipLeave(NONE))
                 .isInstanceOf(IllegalTransactionStateException.class);
     }
 
     @Test
     void 트랜잭션_필수_메서드를_호출자_트랜잭션_안에서_호출하면_정상() {
         assertThatCode(() -> transactionTemplate.executeWithoutResult(status -> {
-            assertThat(lifecycle.closeBySourceDeleted(1L, 2L)).isEmpty();
-            lifecycle.cleanupOnMembershipLeave(1L);
+            assertThat(lifecycle.closeBySourceDeleted(NONE, NONE)).isEmpty();
+            lifecycle.cleanupOnMembershipLeave(NONE);
         })).doesNotThrowAnyException();
     }
 
     @Test
     void 조회와_파기는_트랜잭션_없이_호출해도_된다() {
-        assertThat(lifecycle.findActiveByShift(1L, 2L)).isEmpty();
-        assertThatCode(() -> lifecycle.anonymizeFor(1L)).doesNotThrowAnyException();
+        assertThat(lifecycle.findActiveByShift(NONE, NONE)).isEmpty();
+        assertThatCode(() -> lifecycle.anonymizeFor(NONE)).doesNotThrowAnyException();
     }
 }

@@ -70,4 +70,19 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
                 FOR UPDATE)
             """, nativeQuery = true)
     int deleteExpired(@Param("now") Instant now);
+
+    /**
+     * 탈퇴 파기: 그 소속이 받은 알림 전부 삭제(정책 D05 "본인 수신 알림 파기"). 삭제한 행 수를 돌려준다.
+     * 읽음·확인 UPDATE와 같은 규칙으로 id 오름차순으로 잠근 뒤 지운다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            DELETE FROM notifications
+            WHERE id IN (
+                SELECT id FROM notifications
+                WHERE recipient_membership_id = :recipient
+                ORDER BY id
+                FOR UPDATE)
+            """, nativeQuery = true)
+    int deleteByRecipient(@Param("recipient") long recipientMembershipId);
 }
