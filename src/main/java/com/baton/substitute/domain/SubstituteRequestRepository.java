@@ -31,6 +31,19 @@ public interface SubstituteRequestRepository extends JpaRepository<SubstituteReq
     @Query("select r from SubstituteRequest r where r.id = :id")
     Optional<SubstituteRequest> findByIdForUpdate(@Param("id") Long id);
 
+    /**
+     * 만료 스케줄러: 시작 시각에 도달한 진행 중 요청 id(id 오름차순, afterId 다음부터).
+     * 상태는 리터럴로 써서 부분 인덱스 substitute_requests_active_starts_idx를 탈 수 있게 한다.
+     */
+    @Query("""
+            select r.id from SubstituteRequest r
+            where r.status in (com.baton.substitute.domain.SubstituteStatus.WAITING,
+                               com.baton.substitute.domain.SubstituteStatus.PENDING_MANAGER)
+              and r.sourceStartsAt <= :now and r.id > :afterId
+            order by r.id
+            """)
+    List<Long> findExpirableIds(@Param("now") Instant now, @Param("afterId") long afterId, Limit limit);
+
     // 보낸 요청: 생성 시각·ID 내림차순 커서 ---------------------------------
 
     @Query("""

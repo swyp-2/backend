@@ -279,3 +279,23 @@ ShiftAssignment (com.baton.shift.application.ShiftAssignmentService)
   (필요하면 reassign에 requestId·actorMembershipId 인자 추가)
 
 integration.stub.NoopSubstituteRequestLifecycle: B 구현이 없을 때만 등록되는 빈 구현(IntegrationStubConfig @Bean). 지금은 B 구현이 있어 쓰이지 않는다
+
+## B 스케줄러: 요청 만료·알림 정리 (2026-11-11 B)
+
+| job | 주기(Asia/Seoul) | 하는 일 |
+| --- | --- | --- |
+| SubstituteRequestExpiryJob | 매분 0초 | 원래 근무 시작 시각 이상인 WAITING·PENDING_MANAGER 요청을 EXPIRED로 |
+| NotificationCleanupJob | 매시 정각 | expires_at <= now(생성 후 168시간)인 알림 삭제 |
+| IdempotencyCleanupJob (기존) | 매시 정각 | 24시간 지난 멱등성 기록 삭제 |
+
+- 만료(정책 B15, 기능명세서 SUB-10): closed_at 기록, request_events(REQUEST_EXPIRED, actor NULL).
+  알림은 만들지 않고 근무 담당자는 그대로다. 시작 시각 이후 행동은 API가 이미 REQUEST_EXPIRED로 막으므로
+  주기는 화면 상태가 EXPIRED로 보이기까지의 지연(최대 약 1분)에만 영향을 준다
+- 만료 잠금: substitute_request 행 하나만 FOR UPDATE로 잠그고 상태·시각을 다시 확인한다. 소속·근무는 잠그지 않는다
+  (잠금 순서의 마지막 단계만 사용). 같은 요청의 수락·승인 등과는 이 행 잠금으로 직렬화된다.
+  서버가 여러 대여도 같은 요청을 두 번 만료하지 않는다
+- 만료는 요청 1건마다 트랜잭션을 따로 쓰고 100건씩 id 순서로 처리한다. 실패한 건은 로그만 남기고 다음 실행에서 다시 시도한다
+- 알림 정리: 알림만 지우고 요청·진행 기록은 그대로 둔다. 조회·점 계산은 만료 시각부터 이미 제외하므로 삭제가 늦어도
+  노출되지 않는다. 읽음·확인 UPDATE와 같이 id 오름차순으로 잠근 뒤 지운다
+- 설정: baton.scheduling.enabled=false면 스케줄러 전체가 꺼진다(기본 켜짐). test 프로필은 false이고,
+  테스트는 job 메서드를 직접 호출한다(실제 시각에 job이 돌면서 MutableClock 테스트 데이터를 바꾸지 않게)
