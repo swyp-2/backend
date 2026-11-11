@@ -155,6 +155,28 @@ public final class SubstituteApi {
         return mockMvc.perform(request);
     }
 
+    // 빨간 점(알림) ------------------------------------------------------
+
+    public ResultActions indicator(long userId) throws Exception {
+        return mockMvc.perform(get("/me/notification-indicator")
+                .header(TestUserAuthenticationFilter.HEADER, userId));
+    }
+
+    /** 하단 바 "요청" 탭 점이 켜져 있는지(200 응답 기준). */
+    public boolean hasUnread(long userId) throws Exception {
+        return data(indicator(userId).andExpect(status().isOk())).get("has_unread").asBoolean();
+    }
+
+    public ResultActions openRequestTab(long userId) throws Exception {
+        return mockMvc.perform(post("/me/notifications/open")
+                .header(TestUserAuthenticationFilter.HEADER, userId));
+    }
+
+    public ResultActions check(long userId, long requestId) throws Exception {
+        return mockMvc.perform(post("/me/substitute-requests/{id}/check", requestId)
+                .header(TestUserAuthenticationFilter.HEADER, userId));
+    }
+
     public JsonNode data(ResultActions result) throws Exception {
         return body(result).get("data");
     }

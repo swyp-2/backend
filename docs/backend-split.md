@@ -167,7 +167,8 @@ A에게 영향: Lifecycle.findActiveByShift가 실제 값을 돌려준다 (근�
 | approve | 소속 매니저 | PENDING_MANAGER | APPROVED + 근무 담당자 → 후보(ShiftAssignment.reassign) | 요청자·후보·매니저 |
 | final-reject | 소속 매니저 | PENDING_MANAGER | REJECTED | 요청자·후보·매니저 |
 
-- 알림은 지금 활성 소속인 사람만, 같은 사람은 1건. "매니저"는 그 매장의 활성 매니저 전원(처리한 매니저 포함)
+- 알림은 지금 활성 소속인 사람만, 같은 사람은 1건. "매니저"는 그 매장의 활성 매니저 전원.
+  단 행동한 본인은 받지 않는다(2026-11-11 변경, 아래 "빨간 점" 절 참고). 위 표의 수신자에서 행위자를 뺀다
 - 진행 기록 kind: CANDIDATE_ACCEPTED, TARGET_DECLINED(전원 거절이면 after_status=ALL_DECLINED), REQUEST_CANCELLED,
   CANDIDATE_WITHDRAWN, MANAGER_APPROVED, MANAGER_REJECTED
 
@@ -222,3 +223,31 @@ A에게 영향
 - 최종 등록 트랜잭션 잠금 순서: idempotency_records → 담당 membership(FOR SHARE, id 오름차순) → shifts(부분 유니크).
   나가기·탈퇴의 membership FOR UPDATE와 직렬화된다
 - 등록한 근무마다 shift_events(CREATED, actor = 매니저 membership, after_value = {assignee_membership_id, starts_at, ends_at})
+
+## B API: 빨간 점(알림) (2026-11-11 B)
+
+**기획 변경(Figma 기준, 2026-11-11 B·팀 결정):** 알림 목록 화면(NT-01)과 `GET /me/notifications`는 만들지 않는다.
+빨간 점을 두 단계로 표시한다. 기능명세서 v3.2(NTF-01~05)와 다르므로 PM 문서 반영 필요.
+
+| 점 | 켜지는 조건 | 지우는 호출 |
+| --- | --- | --- |
+| 하단 바 "요청" 탭 | 최근 7일 보관 중 미읽음 알림(read_at NULL)이 있음 | 요청 탭 진입 시 `POST /me/notifications/open` |
+| 요청 카드 | 그 요청에 대한 보관 중 미확인 알림(checked_at NULL)이 있음 | 카드를 눌러 상세를 열 때 `POST /me/substitute-requests/{id}/check` |
+
+| 메서드·경로 | 응답 |
+| --- | --- |
+| GET /me/notification-indicator | 200 {has_unread} |
+| POST /me/notifications/open | 204. 호출 시점까지 저장된 본인 알림 전부 읽음. 이후 도착분은 미읽음. 카드 점은 그대로 |
+| POST /me/substitute-requests/{id}/check | 204. 그 요청의 본인 알림 확인(+미읽음이면 읽음). 관계없는·없는 요청이면 변경 없음 |
+| GET /me/substitute-requests (기존) | 목록 항목에 `unchecked`(카드 점) 추가 |
+
+- 모두 현재 활성 소속 기준. 활성 소속이 없으면 403. Idempotency-Key는 받지 않는다(재시도해도 결과 같음)
+- 계약 초안의 visit_id·read_through_token은 두지 않는다. "그 문장 실행 시점에 저장이 끝난 알림"만 바꾸므로
+  시각·id 워터마크가 필요 없다(시퀀스 id·생성 시각은 커밋 순서와 다를 수 있음)
+- 생성 후 정확히 168시간이 되면 두 점 계산에서 모두 빠진다
+- 스키마: V202611111000__b_notification_checked.sql — notifications.checked_at 추가,
+  CHECK(checked_at IS NULL OR read_at IS NOT NULL), 미읽음·미확인 부분 인덱스
+- 잠금: 읽음·확인 UPDATE는 알림 행을 id 오름차순으로 잠근 뒤 바꾼다(같은 사람의 open·check 동시 실행 교착 방지).
+  대타 처리는 알림을 INSERT만 하므로 기존 잠금 순서(idempotency → membership → shift → substitute_request)와 겹치지 않는다
+- 행동한 본인은 결과 알림을 받지 않는다(2026-11-11 결정, 기능명세서 NTF-04 "행위자 본인도 포함"과 다름).
+  매니저가 여럿이면 처리한 매니저만 빠진다. 새 요청 알림(지정 대상에게)은 원래 본인이 받지 않는다

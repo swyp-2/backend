@@ -5,6 +5,7 @@ import com.baton.common.ErrorCode;
 import com.baton.integration.ActiveMembership;
 import com.baton.integration.MembershipQuery;
 import com.baton.integration.ShiftAssignment;
+import com.baton.notification.application.NotificationService;
 import com.baton.substitute.application.SubstituteRequestViews.Detail;
 import com.baton.substitute.application.SubstituteRequestViews.EventView;
 import com.baton.substitute.application.SubstituteRequestViews.MemberRef;
@@ -21,6 +22,7 @@ import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +47,7 @@ public class SubstituteRequestQueryService {
     private final RequestEventRepository eventRepository;
     private final MembershipQuery membershipQuery;
     private final ShiftAssignment shiftAssignment;
+    private final NotificationService notificationService;
     private final Clock clock;
 
     /**
@@ -113,12 +116,15 @@ public class SubstituteRequestQueryService {
                         .collect(Collectors.toMap(RequestRecipient::getRequestId, r -> r.getResponse().name()))
                 : Map.of();
 
+        Set<Long> unchecked = notificationService.uncheckedRequestIds(membershipId,
+                page.stream().map(SubstituteRequest::getId).toList());
+
         Names names = new Names(membershipQuery);
         List<Summary> items = page.stream()
                 .map(r -> new Summary(r.getId(), r.getStatus().name(), nameOrNull(r.getTerminalReason()),
                         new ShiftRef(r.getShiftId(), r.getSourceStartsAt(), r.getSourceEndsAt(), null),
                         names.ref(r.getRequesterMembershipId()), names.ref(r.getCandidateMembershipId()),
-                        myResponses.get(r.getId()), r.getCreatedAt()))
+                        myResponses.get(r.getId()), unchecked.contains(r.getId()), r.getCreatedAt()))
                 .toList();
         String nextCursor = hasMore
                 ? new RequestCursor(page.getLast().getCreatedAt(), page.getLast().getId()).encode()
