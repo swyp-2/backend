@@ -62,4 +62,19 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Membership m where m.id = :id and m.state = com.baton.store.domain.MembershipState.ACTIVE")
     Optional<Membership> findActiveByIdForUpdate(@Param("id") Long id);
+
+    /** 나가기: 이 매장의 본인 활성 소속을 FOR UPDATE. B의 수락·승인(lockActiveById)과 같은 행을 잠가 직렬화한다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select m from Membership m
+            where m.storeId = :storeId and m.userId = :userId
+              and m.state = com.baton.store.domain.MembershipState.ACTIVE
+            """)
+    Optional<Membership> findActiveByStoreAndUserForUpdate(@Param("storeId") Long storeId,
+                                                           @Param("userId") Long userId);
+
+    /** 탈퇴: 본인 소속 전부(ACTIVE·LEFT)를 id 오름차순 FOR UPDATE. 잠금 순서의 첫 단계(membership). */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select m from Membership m where m.userId = :userId order by m.id")
+    List<Membership> findAllByUserIdForUpdate(@Param("userId") Long userId);
 }

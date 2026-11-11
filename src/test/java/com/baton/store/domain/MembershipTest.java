@@ -49,13 +49,13 @@ class MembershipTest {
     }
 
     @Test
-    void 이미_나간_소속은_탈퇴_시_상태와_나간_시각을_유지하고_연결만_끊는다() {
+    void 이미_나간_소속도_탈퇴하면_WITHDRAWN이_되고_나간_시각은_유지한다() {
         Membership membership = active();
         membership.leave(now);
 
         membership.withdraw(now.plusSeconds(60));
 
-        assertThat(membership.getState()).isEqualTo(MembershipState.LEFT);
+        assertThat(membership.getState()).isEqualTo(MembershipState.WITHDRAWN);
         assertThat(membership.getLeftAt()).isEqualTo(now);
         assertThat(membership.getUserId()).isNull();
     }

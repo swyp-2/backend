@@ -28,4 +28,9 @@ public interface AuthSessionRepository extends JpaRepository<AuthSession, Long> 
     @Modifying
     @Query("update AuthSession s set s.revokedAt = :now where s.id = :id and s.revokedAt is null")
     int revokeIfActive(@Param("id") long id, @Param("now") Instant now);
+
+    /** 탈퇴: 본인 세션 전부 삭제(폐기 기록도 남기지 않는다). */
+    @Modifying
+    @Query("delete from AuthSession s where s.userId = :userId")
+    int deleteByUserId(@Param("userId") long userId);
 }
