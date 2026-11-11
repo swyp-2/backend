@@ -74,8 +74,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     /**
      * 탈퇴 파기: 그 소속이 받은 알림 전부 삭제(정책 D05 "본인 수신 알림 파기"). 삭제한 행 수를 돌려준다.
      * 읽음·확인 UPDATE와 같은 규칙으로 id 오름차순으로 잠근 뒤 지운다.
+     *
+     * <p>A의 탈퇴 트랜잭션 안에서 호출되므로 영속성 컨텍스트를 비우지 않는다(clearAutomatically 없음).
+     * 비우면 A가 이미 읽어 둔 소속·회원 엔티티가 분리돼 이후 변경(소속 WITHDRAWN, user_id NULL 등)이 저장되지 않는다.
      */
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Modifying(flushAutomatically = true)
     @Query(value = """
             DELETE FROM notifications
             WHERE id IN (
