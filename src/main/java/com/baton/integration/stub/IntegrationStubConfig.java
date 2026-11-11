@@ -2,6 +2,7 @@ package com.baton.integration.stub;
 
 import com.baton.integration.ShiftAssignment;
 import com.baton.integration.StoreManagerQuery;
+import com.baton.integration.SubstituteRequestLifecycle;
 import jakarta.persistence.EntityManager;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -28,5 +29,12 @@ public class IntegrationStubConfig {
     @ConditionalOnMissingBean(StoreManagerQuery.class)
     public StoreManagerQuery storeManagerQueryStub(EntityManager entityManager) {
         return new StoreManagerQueryStub(entityManager);
+    }
+
+    /** B의 SubstituteRequestLifecycle 구현이 없을 때만 등록된다(A 작성). */
+    @Bean
+    @ConditionalOnMissingBean(SubstituteRequestLifecycle.class)
+    public SubstituteRequestLifecycle noopSubstituteRequestLifecycle() {
+        return new NoopSubstituteRequestLifecycle();
     }
 }
