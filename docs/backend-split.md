@@ -72,6 +72,7 @@ A가 구현, B가 호출:
 
     // [2026-11-10 B 추가] 실제 파일: com.baton.integration.StoreManagerQuery → **A 구현 요청**
     // 대타 처리 결과 알림의 "소속 매니저" 수신자 계산용. A 구현 전까지 B의 스텁(StoreManagerQueryStub)이 쓰인다
+    // [2026-11-11 A 구현 완료] com.baton.store.application.MembershipGuard가 구현. 스텁은 @ConditionalOnMissingBean으로 자동 제외
     public interface StoreManagerQuery {
         // 매장의 ACTIVE MANAGER 소속, id 오름차순. 잠그지 않음. 없으면 빈 목록
         List<ActiveMembership> findActiveManagers(long storeId);

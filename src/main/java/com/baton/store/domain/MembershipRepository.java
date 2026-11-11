@@ -19,6 +19,8 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
     List<Membership> findByStoreIdAndStateAndRoleAndIdNotOrderByIdAsc(Long storeId, MembershipState state, Role role,
                                                                        Long excludeId);
 
+    List<Membership> findByStoreIdAndStateAndRoleOrderByIdAsc(Long storeId, MembershipState state, Role role);
+
     long countByStoreIdAndState(Long storeId, MembershipState state);
 
     @Query("""

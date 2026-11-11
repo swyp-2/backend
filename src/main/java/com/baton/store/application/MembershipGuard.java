@@ -4,6 +4,7 @@ import com.baton.common.BusinessException;
 import com.baton.common.ErrorCode;
 import com.baton.integration.ActiveMembership;
 import com.baton.integration.MembershipQuery;
+import com.baton.integration.StoreManagerQuery;
 import com.baton.member.domain.AccountState;
 import com.baton.member.domain.Role;
 import com.baton.member.domain.UserRepository;
@@ -19,11 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 현재 사용자의 매장 소속·역할 판정. 권한의 근거는 DB의 활성 소속뿐이다.
+ * B가 쓰는 {@link MembershipQuery}·{@link StoreManagerQuery}의 실제 구현이다(이 빈이 있으면 integration.stub의 임시 구현은 빠진다).
  */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class MembershipGuard implements MembershipQuery {
+public class MembershipGuard implements MembershipQuery, StoreManagerQuery {
 
     public static final String WITHDRAWN_MEMBER_NAME = "탈퇴한 구성원";
 
@@ -61,6 +63,15 @@ public class MembershipGuard implements MembershipQuery {
     public List<ActiveMembership> findCrewCandidates(long storeId, long excludeMembershipId) {
         return membershipRepository.findByStoreIdAndStateAndRoleAndIdNotOrderByIdAsc(
                         storeId, MembershipState.ACTIVE, Role.CREW, excludeMembershipId).stream()
+                .map(MembershipGuard::toActive)
+                .toList();
+    }
+
+    /** 대타 결과 알림의 "소속 매니저" 수신자. 매장의 ACTIVE MANAGER, id 오름차순. 잠그지 않는다. */
+    @Override
+    public List<ActiveMembership> findActiveManagers(long storeId) {
+        return membershipRepository.findByStoreIdAndStateAndRoleOrderByIdAsc(
+                        storeId, MembershipState.ACTIVE, Role.MANAGER).stream()
                 .map(MembershipGuard::toActive)
                 .toList();
     }

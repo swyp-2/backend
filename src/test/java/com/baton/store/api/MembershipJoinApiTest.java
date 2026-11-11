@@ -72,6 +72,25 @@ class MembershipJoinApiTest {
     }
 
     @Test
+    void 빈_값과_형식_오류는_같은_필드에서_다른_문구로_구분한다() throws Exception {
+        long crewId = onboarding.userWithRole("CREW");
+        api.join(crewId, "   ").andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.field_errors[0].field").value("code"))
+                .andExpect(jsonPath("$.error.field_errors[0].reason").value("매장 코드를 입력해 주세요."));
+        api.join(crewId, "abc12345").andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.field_errors[0].field").value("code"))
+                .andExpect(jsonPath("$.error.field_errors[0].reason").value("영문 대문자·숫자 8자리로 입력해 주세요."));
+    }
+
+    @Test
+    void 초대_코드는_발급_후_시간이_지나도_매장이_있는_동안_유효하다() throws Exception {
+        jdbcTemplate.update("UPDATE invite_codes SET created_at = now() - interval '3 years' WHERE code = ?", code);
+
+        api.join(onboarding.userWithRole("CREW"), code).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.store_id").value(storeId));
+    }
+
+    @Test
     void 없는_코드는_422_INVALID_INVITE_CODE() throws Exception {
         long crewId = onboarding.userWithRole("CREW");
         String unknown = code.equals("ZZZZZZZZ") ? "YYYYYYYY" : "ZZZZZZZZ";
