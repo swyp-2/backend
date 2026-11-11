@@ -5,6 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.baton.store.domain.Membership;
+import com.baton.store.domain.MembershipRepository;
 import com.baton.auth.security.TestUserAuthenticationFilter;
 import com.baton.integration.MembershipQuery;
 import com.baton.integration.SubstituteRequestLifecycle;
@@ -29,6 +31,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +70,7 @@ class SubstituteRequestLifecycleIntegrationTest {
     @Autowired RequestEventRepository eventRepository;
     @Autowired SubstituteRequestLifecycle lifecycle;
     @Autowired MembershipQuery membershipQuery;
+    @Autowired MembershipRepository membershipRepository;
     @Autowired TransactionTemplate transactionTemplate;
     @Autowired JdbcTemplate jdbcTemplate;
     @Autowired MutableClock clock;
@@ -293,6 +297,47 @@ class SubstituteRequestLifecycleIntegrationTest {
         }
     }
 
+    /**
+     * 매니저가 나가는 트랜잭션이 소속을 잡고 있는 동안 그 매니저의 승인은 기다리고,
+     * 나가기가 확정되면 403으로 끝난다(나간 매니저의 승인이 확정되지 않는다).
+     */
+    @Test
+    void 매니저가_나가는_중이면_그_매니저의_승인은_기다렸다가_403이고_요청은_그대로다() throws Exception {
+        long shiftId = api.shift(store.storeId(), requester, 1);
+        long requestId = createRequest(shiftId, List.of(target1));
+        api.transitionOk(store.crew(1).userId(), requestId, "accept");
+        long manager = store.manager().membershipId();
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch commit = new CountDownLatch(1);
+        try {
+            Future<?> leave = executor.submit(() -> transactionTemplate.executeWithoutResult(status -> {
+                Membership membership = membershipRepository.findActiveByIdForUpdate(manager).orElseThrow();
+                membership.leave(clock.instant());
+                locked.countDown();
+                await(commit);
+            }));
+            assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
+
+            Future<Integer> approve = executor.submit(() -> api.transition(store.manager().userId(), requestId,
+                    "approve").andReturn().getResponse().getStatus());
+            waitUntilBlockedOnLock();
+            assertThat(approve.isDone()).isFalse();
+
+            commit.countDown();
+            leave.get(30, TimeUnit.SECONDS);
+
+            assertThat(approve.get(30, TimeUnit.SECONDS)).isEqualTo(403);
+            assertThat(request(requestId).getStatus()).isEqualTo(SubstituteStatus.PENDING_MANAGER);
+            assertThat(shiftRepository.findById(shiftId).orElseThrow().getAssigneeMembershipId())
+                    .isEqualTo(requester);
+        } finally {
+            commit.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     // ---- 탈퇴 파기 ---------------------------------------------------------
 
     @Test
@@ -309,6 +354,31 @@ class SubstituteRequestLifecycleIntegrationTest {
     }
 
     // ---- helpers ----------------------------------------------------------
+
+    /** 다른 세션이 행 잠금을 기다리기 시작할 때까지(최대 10초) 확인한다. */
+    private void waitUntilBlockedOnLock() throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            Integer waiting = jdbcTemplate.queryForObject("""
+                    select count(*) from pg_stat_activity
+                    where datname = current_database() and wait_event_type = 'Lock'
+                    """, Integer.class);
+            if (waiting != null && waiting > 0) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("승인이 매니저 소속 잠금을 기다리지 않았다");
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            assertThat(latch.await(30, TimeUnit.SECONDS)).isTrue();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
+    }
 
     private long createRequest(long shiftId, List<Long> targets) throws Exception {
         return api.createRequest(store.crew(0).userId(), shiftId, targets).get("id").asLong();

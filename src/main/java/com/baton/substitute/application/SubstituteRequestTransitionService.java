@@ -37,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>모든 전이의 공통 흐름(잠금 순서: idempotency_records(호출자) → membership → shift → substitute_request):
  * <ol>
  *   <li>잠그지 않은 관계자 스냅샷으로 매장을 찾고 호출자의 활성 소속을 확인한다</li>
- *   <li>요청자·후보·행위 크루원 소속을 id 오름차순으로 잠근다. 나가기·탈퇴와 직렬화되고, 알림 수신 가능 여부도 이것으로 정한다</li>
+ *   <li>요청자·후보·행위자(크루원·매니저) 소속을 id 오름차순으로 잠근다. 나가기·탈퇴와 직렬화되고, 알림 수신 가능 여부도 이것으로 정한다</li>
  *   <li>(승인만) 근무 행을 잠근다</li>
  *   <li>요청 행을 잠그고 상태·관계·시작 시각을 다시 확인한 뒤 바꾼다. 처리 기록과 알림을 같은 트랜잭션에 남긴다</li>
  * </ol>
@@ -50,7 +50,6 @@ public class SubstituteRequestTransitionService {
     static final String IDENTICAL_SHIFT_INDEX = "shifts_identical_live_uk";
     static final String CANDIDATE_HAS_SAME_SHIFT = "후보에게 이미 같은 시간의 근무가 있어요. 근무표를 확인해 주세요.";
     private static final String MANAGER = "MANAGER";
-    private static final String CREW = "CREW";
 
     private final SubstituteRequestRepository requestRepository;
     private final RequestRecipientRepository recipientRepository;
@@ -193,16 +192,16 @@ public class SubstituteRequestTransitionService {
         if (parties.candidateMembershipId() != null) {
             toLock.add(parties.candidateMembershipId());
         }
-        if (CREW.equals(actor.role())) {
-            toLock.add(actor.membershipId());
-        }
+        // 행위자도 역할과 관계없이 잠근다. 매니저의 승인·최종 거절도 같은 매니저의 나가기·탈퇴와 직렬화된다
+        // (2026-11-12 B 결정, review-b 결정 필요 3)
+        toLock.add(actor.membershipId());
         Set<Long> active = new HashSet<>();
         for (Long membershipId : toLock) {
             membershipQuery.lockActiveById(membershipId)
                     .filter(m -> m.storeId() == parties.storeId())
                     .ifPresent(m -> active.add(m.membershipId()));
         }
-        if (CREW.equals(actor.role()) && !active.contains(actor.membershipId())) {
+        if (!active.contains(actor.membershipId())) {
             // 확인 직후 나가기·탈퇴가 먼저 확정됨
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }

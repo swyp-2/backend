@@ -110,6 +110,14 @@ PK는 A와 같은 방식(테이블별 시퀀스, INCREMENT 50).
 - 알림에는 store_id를 두지 않는다 (수신자 소속에서 알 수 있음)
 - 탈퇴해도 요청·이벤트의 membership_id는 남긴다. A가 memberships.user_id를 비워 개인과의 연결이 끊어지기 때문이다.
   anonymizeFor는 본인이 받은 알림만 삭제한다 → **A 확인 필요**
+  - **임시 결정(2026-11-12 B, PM 부재 중) → PM 확인 필요.** 요청·진행 기록의 membership_id는 지우거나 바꾸지 않는다.
+    정책 D05는 "기록에 개인 연결 ID를 남기지 않는다"고 하지만, 다음 이유로 탈퇴 시 끊기는 개인 연결은 memberships.user_id로 본다
+    - 진행 기록에는 이름을 저장하지 않고 조회할 때마다 displayNameOf로 가져온다. 탈퇴 후에는 "탈퇴한 구성원"으로 나온다
+    - membership_id를 고정된 익명 값으로 바꿔도 한 사람을 가리키는 ID라 재식별 위험은 같다.
+      기록마다 다른 값으로 바꾸면 남은 구성원의 기록에서 요청자·후보 관계가 깨진다
+    - A의 근무 기록(shifts.assignee_membership_id)도 membership_id를 남기므로 기준을 맞춘다
+    - 전제(코드로 확인함, A의 AccountService.withdraw): 모든 소속의 user_id를 비우고(Membership.withdraw),
+      users의 이름·역할을 지우고(User.withdraw), 소셜 계정·세션·동의·멱등성 기록을 삭제한다
 
 ### integration 임시 구현 (모두 삭제됨)
 - 2026-11-11 B: A의 실제 구현(ShiftAssignmentService)이 들어와 ShiftAssignmentStub과 그 테스트를 삭제했다.
@@ -189,8 +197,11 @@ A에게 영향: Lifecycle.findActiveByShift가 실제 값을 돌려준다 (근�
 - 요청 본문에 expected_version을 받지 않는다. 잠금 후 상태·관계·시작 시각을 서버가 다시 검사한다
 - 후보 중복 근무 충돌은 새 에러 코드 없이 SHIFT_STATE_CONFLICT + 메시지 "후보에게 이미 같은 시간의 근무가 있어요..."
 
-잠금 순서: idempotency_records → 요청자·후보·행위 크루원 membership(id 오름차순, lockActiveById) →
-(승인만) shift(lockSnapshot) → substitute_request(FOR UPDATE). 매니저 본인 소속은 잠그지 않는다.
+잠금 순서: idempotency_records → 요청자·후보·행위자(크루원·매니저) membership(id 오름차순, lockActiveById) →
+(승인만) shift(lockSnapshot) → substitute_request(FOR UPDATE).
+- 2026-11-12 B: 처음에는 매니저 본인 소속을 잠그지 않았다. 그래서 승인 중 같은 매니저의 나가기·탈퇴가 먼저 확정되면
+  나간 매니저의 승인이 확정될 수 있었다. 지금은 행위자를 역할과 관계없이 잠그고, 잠근 뒤 비활성이면 403 FORBIDDEN이다.
+  나가기·탈퇴(떠나는 membership FOR UPDATE)와 직렬화된다(review-b 결정 필요 3)
 
 A에게 영향
 - StoreManagerQuery 구현 요청 (위 인터페이스 절)
@@ -319,6 +330,10 @@ integration.stub.NoopSubstituteRequestLifecycle: B 구현이 없을 때만 등�
 | 그 밖의 지정 대상 | 그 대상만 UNAVAILABLE. WAITING에서 미응답 대상이 더 없으면: 거절한 대상이 남았으면 ALL_DECLINED, 모두 응답 불가면 CANCELLED(NO_ACTIVE_TARGET) |
 
 - 남은 대상이 모두 거절한 상태면 ALL_DECLINED로 종료한다(2026-11-11 B 결정). 거절 API의 "미응답 대상이 없으면 ALL_DECLINED"와 같은 규칙
+  - **임시 결정(2026-11-12 B, PM 부재 중) → PM 확인 필요.** 명세(SUB-10·D20)는 "응답 가능 대상 0명이면 NO_ACTIVE_TARGET"만 정한다.
+    "응답 가능 대상"을 "미응답 대상"으로 해석했다. 거절한 대상은 재수락할 수 있지만(D12) 이미 거절 의사를 밝혔으므로,
+    WAITING으로 두면 요청이 근무 시작까지 방치되고 요청자는 결과 알림을 받지 못한다. ALL_DECLINED로 끝내면
+    요청자·매니저가 결과 알림을 받고 바로 새 요청을 만들 수 있다
 - 지정 대상만 응답 불가가 되고 요청이 계속되면 진행 기록·알림을 남기지 않는다
 - **A 호출 조건:** 나가기·탈퇴는 떠나는 소속을 FOR UPDATE로 잠근 뒤, 소속을 해제하는 같은 트랜잭션에서
   cleanupOnMembershipLeave를 호출한다. 그래야 그 사람이 관련된 수락·승인(소속을 먼저 잠금)과 직렬화된다.
