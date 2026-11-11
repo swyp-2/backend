@@ -8,6 +8,9 @@ logging:
     org.testcontainers: info
 
 baton:
+  # 스케줄러는 끄고 테스트에서 job 메서드를 직접 호출한다
+  scheduling:
+    enabled: false
   auth:
     jwt-secret: test-only-baton-jwt-secret-0123456789abcdef
     google:
