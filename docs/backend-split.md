@@ -71,8 +71,8 @@ A가 구현, B가 호출:
     public record ActiveMembership(long membershipId, long storeId, long userId, String role) {}
 
     // [2026-11-10 B 추가] 실제 파일: com.baton.integration.StoreManagerQuery → **A 구현 요청**
-    // 대타 처리 결과 알림의 "소속 매니저" 수신자 계산용. A 구현 전까지 B의 스텁(StoreManagerQueryStub)이 쓰인다
-    // [2026-11-11 A 구현 완료] com.baton.store.application.MembershipGuard가 구현. 스텁은 @ConditionalOnMissingBean으로 자동 제외
+    // 대타 처리 결과 알림의 "소속 매니저" 수신자 계산용. A 구현 전까지 B의 스텁(StoreManagerQueryStub)을 썼다
+    // [2026-11-11 A 구현 완료] com.baton.store.application.MembershipGuard가 구현. B의 스텁은 삭제함(2026-11-11 B)
     public interface StoreManagerQuery {
         // 매장의 ACTIVE MANAGER 소속, id 오름차순. 잠그지 않음. 없으면 빈 목록
         List<ActiveMembership> findActiveManagers(long storeId);
@@ -111,9 +111,12 @@ PK는 A와 같은 방식(테이블별 시퀀스, INCREMENT 50).
 - 탈퇴해도 요청·이벤트의 membership_id는 남긴다. A가 memberships.user_id를 비워 개인과의 연결이 끊어지기 때문이다.
   anonymizeFor는 본인이 받은 알림만 삭제한다 → **A 확인 필요**
 
-### ShiftAssignment 임시 구현 (삭제됨)
+### integration 임시 구현 (모두 삭제됨)
 - 2026-11-11 B: A의 실제 구현(ShiftAssignmentService)이 들어와 ShiftAssignmentStub과 그 테스트를 삭제했다.
-  StoreManagerQuery 스텁은 A 구현이 아직 없어 남겨 둔다
+- 2026-11-11 B: 모든 인터페이스에 실제 구현이 생겨 com.baton.integration.stub 패키지를 통째로 삭제했다.
+  StoreManagerQueryStub(B 작성, 실제 구현은 A의 MembershipGuard), NoopSubstituteRequestLifecycle(A 작성,
+  실제 구현은 B의 SubstituteRequestLifecycleService), IntegrationStubConfig.
+  이제 실제 구현 빈이 없으면 앱이 시작되지 않는다(빈 구현으로 조용히 넘어가지 않음)
 
 ## B API: 대타 요청 생성·조회 (2026-11-09)
 
