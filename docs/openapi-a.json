@@ -1,0 +1,3443 @@
+{
+  "openapi" : "3.1.0",
+  "info" : {
+    "title" : "BATON API",
+    "version" : "v1"
+  },
+  "servers" : [ {
+    "url" : "http://localhost",
+    "description" : "Generated server url"
+  } ],
+  "security" : [ {
+    "bearerAuth" : [ ]
+  } ],
+  "tags" : [ {
+    "name" : "온보딩",
+    "description" : "내 정보·약관 동의·이름·역할(가입 단계)"
+  }, {
+    "name" : "계정",
+    "description" : "매장 나가기·계정 탈퇴"
+  }, {
+    "name" : "매장",
+    "description" : "매장 만들기·매장 정보·초대 코드·코드로 참여·구성원"
+  }, {
+    "name" : "인증",
+    "description" : "소셜 로그인·로그아웃"
+  }, {
+    "name" : "근무",
+    "description" : "근무 달력·날짜별 명단·근무 상세·일괄 등록·삭제"
+  }, {
+    "name" : "알림",
+    "description" : "하단 바 \"요청\" 탭 점·요청 카드 점 (알림 목록 화면 없음)"
+  }, {
+    "name" : "대타 요청",
+    "description" : "대타 요청 생성·상세·보낸/받은 목록·수락/거절/취소/철회/최종 승인/최종 거절"
+  } ],
+  "paths" : {
+    "/me/onboarding/role" : {
+      "put" : {
+        "tags" : [ "온보딩" ],
+        "summary" : "가입 역할 저장",
+        "description" : "COM-04 / CO-05\n\nMANAGER 또는 CREW를 저장한다. ROLE_REQUIRED → STORE_REQUIRED. 어떤 매장 권한도 생기지 않는다\n(매장 권한은 소속의 role로만 판정). 가입 후 역할 변경 API가 아니다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 409 ONBOARDING_STAGE_CONFLICT: ROLE_REQUIRED 단계가 아님, 또는 이미 활성 매장 소속이 있음.\n  current_state에 현재 단계\n- 422 VALIDATION_FAILED: MANAGER·CREW 외 값·누락(field: role), 본문을 읽을 수 없음(field: body)\n",
+        "operationId" : "selectRole",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RoleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "저장 후 내 정보",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMeResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "가입 단계 충돌",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "입력 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/onboarding/name" : {
+      "put" : {
+        "tags" : [ "온보딩" ],
+        "summary" : "가입 이름 저장",
+        "description" : "COM-03 / CO-04\n\n앞뒤 공백을 뺀 이름을 저장한다. NAME_REQUIRED → ROLE_REQUIRED. 매장 소속은 만들지 않는다.\n단계 검사가 이름 검증보다 먼저다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 409 ONBOARDING_STAGE_CONFLICT: NAME_REQUIRED 단계가 아님. current_state에 현재 단계\n- 422 VALIDATION_FAILED: 이름 누락, 앞뒤 공백 제거 후 2~15자 아님, 줄바꿈·제어문자 포함(field: display_name),\n  본문을 읽을 수 없음(field: body)\n",
+        "operationId" : "setName",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/NameRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "저장 후 내 정보",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMeResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "가입 단계 충돌",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "입력 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test-idempotency/targets/{targetId}" : {
+      "post" : {
+        "tags" : [ "idempotency-test-controller" ],
+        "operationId" : "run",
+        "parameters" : [ {
+          "name" : "targetId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/Body"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test-errors/validation" : {
+      "post" : {
+        "tags" : [ "exception-test-controller" ],
+        "operationId" : "validation",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SampleRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSampleRequest"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/substitute-requests" : {
+      "post" : {
+        "tags" : [ "대타 요청" ],
+        "summary" : "대타 요청 보내기 (RQ-01)",
+        "description" : "본인 담당·시작 전 근무에 대타 요청을 만들고 지정한 동료에게 새 요청 알림을 보낸다.\n응답은 만든 요청의 상세다. 같은 Idempotency-Key로 다시 보내면 처음 결과를 그대로 돌려준다.\n\n- 403 FORBIDDEN: 매장 소속이 아님 / 매니저 / 본인 담당 근무가 아님\n- 404 NOT_FOUND: 없는 근무\n- 409 SHIFT_STATE_CONFLICT: 삭제된 근무\n- 409 REQUEST_EXPIRED: 이미 시작한 근무\n- 409 ACTIVE_REQUEST_EXISTS: 같은 근무에 진행 중 요청이 있음. existing_request_id의 상세로 이동한다\n- 422 VALIDATION_FAILED: 대상 0명·중복·본인·매니저·다른 매장(field: target_membership_ids), 본문 누락\n- 422 IDEMPOTENCY_KEY_REUSED: 같은 키를 다른 내용으로 재사용\n",
+        "operationId" : "create",
+        "parameters" : [ {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "중복 제출 방지 키. 영문·숫자·-·_ 1~100자. 재시도할 때는 같은 키를 다시 보낸다",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateSubstituteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "생성된 요청 상세",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSubstituteRequestDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "권한 없음",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "없는 근무",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "근무·요청 상태 충돌",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "입력 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/substitute-requests/{requestId}/withdraw" : {
+      "post" : {
+        "tags" : [ "대타 요청" ],
+        "summary" : "수락 철회 (RQ-03)",
+        "description" : "현재 후보의 수락 철회. PENDING_MANAGER → WITHDRAWN. 다른 동료에게 자동으로 다시 모집하지 않는다.\n\n- 403 FORBIDDEN: 현재 후보가 아님\n- 409 REQUEST_STATE_CONFLICT: 이미 종료됨(current_state)\n- 409 REQUEST_EXPIRED: 근무 시작 시각이 지남\n",
+        "operationId" : "withdraw",
+        "parameters" : [ {
+          "name" : "requestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "중복 제출 방지 키. 영문·숫자·-·_ 1~100자. 같은 행동을 재시도할 때는 같은 키를 다시 보낸다",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "처리 후 최신 요청 상세",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSubstituteRequestDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "권한 없음(관계·역할·소속)",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "없는 요청",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "요청·근무 상태 충돌, 시작 시각 지남. current_state에 최신 상태",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Idempotency-Key 누락·형식 오류·재사용",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/substitute-requests/{requestId}/reject" : {
+      "post" : {
+        "tags" : [ "대타 요청" ],
+        "summary" : "대타 거절 (RQ-03)",
+        "description" : "미응답 지정 크루원의 거절. 확인 팝업 없이 바로 호출한다. 다른 대상의 응답 기회는 유지되고,\n미응답 대상이 더 없으면 ALL_DECLINED로 종료한다.\n\n- 403 FORBIDDEN: 지정 대상이 아님 / 소속 없음\n- 409 REQUEST_STATE_CONFLICT: 이미 응답함·후보 확정·종료됨(current_state)\n- 409 REQUEST_EXPIRED: 근무 시작 시각이 지남\n",
+        "operationId" : "reject",
+        "parameters" : [ {
+          "name" : "requestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "중복 제출 방지 키. 영문·숫자·-·_ 1~100자. 같은 행동을 재시도할 때는 같은 키를 다시 보낸다",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "처리 후 최신 요청 상세",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSubstituteRequestDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "권한 없음(관계·역할·소속)",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "없는 요청",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "요청·근무 상태 충돌, 시작 시각 지남. current_state에 최신 상태",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Idempotency-Key 누락·형식 오류·재사용",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/substitute-requests/{requestId}/final-reject" : {
+      "post" : {
+        "tags" : [ "대타 요청" ],
+        "summary" : "대타 최종 거절 (AP-02)",
+        "description" : "소속 매니저의 최종 거절. PENDING_MANAGER → REJECTED. 담당자는 바뀌지 않는다. 사유 입력은 없다.\n\n- 403 FORBIDDEN: 매니저가 아님 / 다른 매장\n- 409 REQUEST_STATE_CONFLICT: WAITING·종료됨(current_state)\n- 409 REQUEST_EXPIRED: 근무 시작 시각이 지남\n",
+        "operationId" : "finalReject",
+        "parameters" : [ {
+          "name" : "requestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "중복 제출 방지 키. 영문·숫자·-·_ 1~100자. 같은 행동을 재시도할 때는 같은 키를 다시 보낸다",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "처리 후 최신 요청 상세",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSubstituteRequestDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "권한 없음(관계·역할·소속)",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "없는 요청",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "요청·근무 상태 충돌, 시작 시각 지남. current_state에 최신 상태",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Idempotency-Key 누락·형식 오류·재사용",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/substitute-requests/{requestId}/cancel" : {
+      "post" : {
+        "tags" : [ "대타 요청" ],
+        "summary" : "보낸 요청 취소 (RQ-03)",
+        "description" : "요청자의 취소. WAITING·PENDING_MANAGER → CANCELLED. 근무 담당자는 바뀌지 않는다.\n\n- 403 FORBIDDEN: 요청자가 아님\n- 409 REQUEST_STATE_CONFLICT: 이미 종료됨 / 처리하는 사이 다른 동료가 수락함(current_state)\n- 409 REQUEST_EXPIRED: 근무 시작 시각이 지남\n",
+        "operationId" : "cancel",
+        "parameters" : [ {
+          "name" : "requestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "중복 제출 방지 키. 영문·숫자·-·_ 1~100자. 같은 행동을 재시도할 때는 같은 키를 다시 보낸다",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "처리 후 최신 요청 상세",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSubstituteRequestDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "권한 없음(관계·역할·소속)",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "없는 요청",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "요청·근무 상태 충돌, 시작 시각 지남. current_state에 최신 상태",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Idempotency-Key 누락·형식 오류·재사용",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/substitute-requests/{requestId}/approve" : {
+      "post" : {
+        "tags" : [ "대타 요청" ],
+        "summary" : "대타 최종 승인 (AP-02)",
+        "description" : "소속 매니저의 최종 승인. PENDING_MANAGER → APPROVED, 그 근무 한 건의 담당자를 후보로 바꾼다.\n요청 상태·담당자 변경·처리 기록·결과 알림을 한 트랜잭션에 저장한다.\n\n- 403 FORBIDDEN: 매니저가 아님 / 다른 매장\n- 409 REQUEST_STATE_CONFLICT: WAITING·종료됨, 후보가 매장을 나감(current_state)\n- 409 REQUEST_EXPIRED: 근무 시작 시각이 지남\n- 409 SHIFT_STATE_CONFLICT: 근무가 삭제·변경됨, 후보에게 같은 시간 근무가 이미 있음\n",
+        "operationId" : "approve",
+        "parameters" : [ {
+          "name" : "requestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "중복 제출 방지 키. 영문·숫자·-·_ 1~100자. 같은 행동을 재시도할 때는 같은 키를 다시 보낸다",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "처리 후 최신 요청 상세",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSubstituteRequestDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "권한 없음(관계·역할·소속)",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "없는 요청",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "요청·근무 상태 충돌, 시작 시각 지남. current_state에 최신 상태",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Idempotency-Key 누락·형식 오류·재사용",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/substitute-requests/{requestId}/accept" : {
+      "post" : {
+        "tags" : [ "대타 요청" ],
+        "summary" : "대타 수락 (RQ-03)",
+        "description" : "지정된 크루원의 첫 수락. WAITING → PENDING_MANAGER, 수락자가 후보가 된다. 근무 담당자는 바뀌지 않는다.\n거절했던 대상도 요청이 WAITING이면 다시 수락할 수 있다. 동시 수락은 한 명만 성공한다.\n\n- 403 FORBIDDEN: 지정 대상이 아님 / 소속 없음\n- 409 REQUEST_STATE_CONFLICT: 이미 다른 후보가 있음·종료됨(current_state)\n- 409 REQUEST_EXPIRED: 근무 시작 시각이 지남\n",
+        "operationId" : "accept",
+        "parameters" : [ {
+          "name" : "requestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "중복 제출 방지 키. 영문·숫자·-·_ 1~100자. 같은 행동을 재시도할 때는 같은 키를 다시 보낸다",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "처리 후 최신 요청 상세",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSubstituteRequestDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "권한 없음(관계·역할·소속)",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "없는 요청",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "요청·근무 상태 충돌, 시작 시각 지남. current_state에 최신 상태",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Idempotency-Key 누락·형식 오류·재사용",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stores" : {
+      "post" : {
+        "tags" : [ "매장" ],
+        "summary" : "매장 만들기",
+        "description" : "STR-01 / ST-01\n\n매장, 생성자의 MANAGER 소속, 매장 공통 초대 코드를 한 번에 만든다. 가입 단계 STORE_REQUIRED → COMPLETED.\n같은 Idempotency-Key·같은 본문으로 다시 보내면 처음 결과를 그대로 돌려준다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 403 FORBIDDEN: 매장 연결 단계(STORE_REQUIRED)가 아니거나 가입 역할이 MANAGER가 아님\n- 409 ALREADY_IN_STORE: 이미 활성 매장 소속이 있음(다른 키로 연속 제출한 두 번째 요청 포함)\n- 422 VALIDATION_FAILED: Idempotency-Key 누락·형식 오류(field: Idempotency-Key),\n  매장명 누락·앞뒤 공백 제거 후 1~15자 아님·줄바꿈·제어문자(field: name), 본문을 읽을 수 없음(field: body)\n- 422 IDEMPOTENCY_KEY_REUSED: 같은 키를 다른 본문으로 재사용\n",
+        "operationId" : "create_1",
+        "parameters" : [ {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "중복 제출 방지 키. 영문·숫자·-·_ 1~100자. 재시도할 때는 같은 키를 다시 보낸다",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          },
+          "example" : "store-create-3f9a1c"
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateStoreRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "만든 매장",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCreateStoreResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "단계·역할 아님",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "이미 매장 소속",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "입력 오류·Idempotency-Key 오류·재사용",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stores/{storeId}/leave" : {
+      "post" : {
+        "tags" : [ "계정" ],
+        "summary" : "매장 나가기",
+        "description" : "PRO-03 / PR-04\n\n확인 후 매장 소속을 해제한다. 계정·로그인은 유지되고 가입 단계는 매장 연결(ST-01/ST-03)로 돌아간다.\n진행 중인 대타 요청은 함께 정리된다(요청자면 취소, 승인 대기 후보면 철회, 지정 대상이면 응답 불가).\n나간 뒤 이전 매장 API는 모두 403. 다시 참여하려면 유효한 초대 코드로 새로 참여한다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 403 FORBIDDEN: 이 매장의 활성 소속이 아님(다른 매장, 이미 나감)\n- 409 FUTURE_SHIFT_REMAINS: 끝나지 않은 본인 근무(예정·진행 중)가 있음. 아무것도 바뀌지 않는다\n- 422 VALIDATION_FAILED: storeId 형식 오류(field: store_id)\n",
+        "operationId" : "leave",
+        "parameters" : [ {
+          "name" : "storeId",
+          "in" : "path",
+          "description" : "나갈 매장 id",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "example" : 1
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "나감"
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "소속 아님",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "남은 근무 있음",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "경로 형식 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shift-batches" : {
+      "post" : {
+        "tags" : [ "근무" ],
+        "summary" : "근무 일괄 등록",
+        "description" : "SCH-05 / ED-03\n\n미리보기와 같은 입력 + preview_token으로 최종 저장한다. 서버가 권한·계획·구성원·중복을 다시 계산하고,\n완전 동일 중복을 뺀 새 근무만 전부 저장하거나 하나도 저장하지 않는다.\n같은 Idempotency-Key·같은 본문으로 다시 보내면 처음 결과를 그대로 돌려준다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 403 FORBIDDEN: 이 매장의 매니저가 아님\n- 409 PREVIEW_STALE: 토큰 만료(30분)·변조·다른 매장/매니저/입력의 토큰, 미리보기 이후 근무표가 바뀜,\n  저장 중 같은 근무가 먼저 등록됨. 입력을 유지하고 미리보기를 다시 요청한다\n- 422 VALIDATION_FAILED: Idempotency-Key 누락·형식 오류(field: Idempotency-Key),\n  preview_token 누락(field: preview_token), 모두 이미 등록된 근무(field_errors 없음, message로 안내),\n  그 밖의 입력 오류는 미리보기와 같음\n- 422 IDEMPOTENCY_KEY_REUSED: 같은 키를 다른 본문으로 재사용\n",
+        "operationId" : "create_2",
+        "parameters" : [ {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "description" : "중복 제출 방지 키. 영문·숫자·-·_ 1~100자. 재시도할 때는 같은 키를 다시 보낸다",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          },
+          "example" : "shift-batch-7c2e90"
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ShiftBatchCreateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "저장 결과",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseShiftBatchCreated"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "매니저 아님",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "미리보기 이후 변경·토큰 만료",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "입력 오류·Idempotency-Key 오류·재사용",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shift-batches/preview" : {
+      "post" : {
+        "tags" : [ "근무" ],
+        "summary" : "근무 일괄 등록 미리보기",
+        "description" : "SCH-03, SCH-04, SCH-05 / ED-01, ED-02, ED-03\n\n입력으로 만들 근무 계획을 계산하고 이미 있는 완전 동일 근무(같은 담당자·시작·종료)를 duplicate=true로 표시한다.\n근무를 저장하지 않는다. 최종 등록에는 같은 입력과 함께 preview_token(30분 유효)을 보낸다.\n반복이면 시작일~종료일(달력상 최대 1개월, 양 끝 포함)의 선택 요일마다 같은 시각으로 날짜별 근무를 만든다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 403 FORBIDDEN: 이 매장의 매니저가 아님\n- 422 VALIDATION_FAILED: store_id 누락, 근무자 0명·중복·null·현재 구성원 아님(field: assignee_membership_ids),\n  시작·종료 누락·분 단위 아님·길이 0 이하 또는 24시간 이상(field: starts_at, ends_at),\n  반복 시작일이 첫 근무 날짜와 다름·종료일 역전·1개월 초과(field: repeat.start_date, repeat.end_date),\n  요일 0개·1~7 밖·기간 안에 선택 요일 없음(field: repeat.weekdays), 계획이 2000건 초과,\n  본문을 읽을 수 없음(field: body)\n",
+        "operationId" : "preview",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ShiftBatchPreviewRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "미리보기",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseShiftBatchPreview"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "매니저 아님",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "입력 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/memberships/join" : {
+      "post" : {
+        "tags" : [ "매장" ],
+        "summary" : "초대 코드로 매장 참여",
+        "description" : "STR-03 / ST-03\n\n유효한 코드면 승인 단계 없이 바로 CREW 소속을 만든다. 가입 단계 STORE_REQUIRED → COMPLETED.\n같은 매장에 이미 활성 소속이면 새로 만들지 않고 기존 소속을 200으로 돌려준다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 403 FORBIDDEN: 가입 역할이 CREW가 아님, 또는 매장 연결 단계(STORE_REQUIRED)가 아님\n- 409 ALREADY_IN_STORE: 다른 매장에 이미 활성 소속이 있음\n- 422 VALIDATION_FAILED: 코드 빈 값·영문 대문자·숫자 8자리 형식 아님(field: code), 본문을 읽을 수 없음(field: body)\n- 422 INVALID_INVITE_CODE: 형식은 맞지만 유효한 코드가 아님\n",
+        "operationId" : "join",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/JoinRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "참여한 매장",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseJoinResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "단계·역할 아님",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "다른 매장 소속",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "코드 형식 오류·유효하지 않은 코드",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/substitute-requests/{requestId}/check" : {
+      "post" : {
+        "tags" : [ "알림" ],
+        "summary" : "요청 카드 확인 (카드 점 지우기)",
+        "description" : "요청 카드를 눌러 상세를 열 때 호출한다. 그 요청에 대한 본인 알림을 확인 처리해 카드 점을 지운다\n(아직 읽지 않았으면 탭 점 기준의 읽음도 함께 처리). 관계없는 요청이면 아무것도 바뀌지 않는다.\n요청 접근 권한은 상세 조회(GET /substitute-requests/{id})가 따로 검사한다.\n\n- 403 FORBIDDEN: 활성 매장 소속이 없음\n",
+        "operationId" : "check",
+        "parameters" : [ {
+          "name" : "requestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "처리됨"
+          },
+          "403" : {
+            "description" : "소속 없음",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/notifications/open" : {
+      "post" : {
+        "tags" : [ "알림" ],
+        "summary" : "요청 탭 진입 (탭 점 지우기)",
+        "description" : "요청 탭에 들어올 때 한 번 호출한다. 호출 시점까지 도착한 본인 알림을 모두 읽음 처리해 탭 점을 지운다.\n이후 도착한 알림은 미읽음으로 남아 점이 다시 표시된다. 카드 점은 지우지 않는다.\n재시도해도 안전하므로 Idempotency-Key는 받지 않는다.\n\n- 403 FORBIDDEN: 활성 매장 소속이 없음\n",
+        "operationId" : "open",
+        "responses" : {
+          "204" : {
+            "description" : "처리됨"
+          },
+          "403" : {
+            "description" : "소속 없음",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/consents" : {
+      "post" : {
+        "tags" : [ "온보딩" ],
+        "summary" : "약관 동의 저장",
+        "description" : "COM-03 / CO-02\n\n현재 유효한 문서 전부에 대해 동의 여부를 기록한다(동의 시각은 서버 시각). 요청에 없는 선택 문서는 미동의로 기록한다.\nCONSENT_REQUIRED → NAME_REQUIRED. 응답은 갱신된 내 정보다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 409 ONBOARDING_STAGE_CONFLICT: CONSENT_REQUIRED 단계가 아님(이미 동의함 등). current_state에 현재 단계.\n  GET /me 재조회 후 next_screen으로 이동한다\n- 422 VALIDATION_FAILED: agreements·document_id·agreed 누락, 같은 문서 중복, 현재 유효하지 않은 문서,\n  필수 문서 미동의. field는 agreements[document_id=N] 형식. 본문을 읽을 수 없음(field: body)\n",
+        "operationId" : "agree",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConsentAgreeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "저장 후 내 정보",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMeResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "가입 단계 충돌",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "입력 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/{provider}/complete" : {
+      "post" : {
+        "tags" : [ "인증" ],
+        "summary" : "소셜 로그인 완료",
+        "description" : "COM-02 / CO-01\n\nGoogle·Apple SDK가 준 ID 토큰을 검증하고 BATON 액세스 토큰을 발급한다. 처음 로그인하면 회원을 만든다\n(onboarding_stage=CONSENT_REQUIRED). refresh 토큰은 없고, 만료되면 다시 소셜 로그인한다.\n인증 없이 호출한다(Authorization 헤더가 붙어 와도 무시).\n\n- 401 UNAUTHENTICATED: ID 토큰 서명·iss·aud·exp·sub 검증 실패, 제공자 설정 없음, 활성 계정이 아님\n- 404 NOT_FOUND: 지원하지 않는 provider(google·apple 외)\n- 422 VALIDATION_FAILED: id_token 누락·빈 값·8192자 초과, 본문을 읽을 수 없음\n- 500 INTERNAL_ERROR: 제공자 공개키(JWKS) 조회 실패. retryable=true\n",
+        "operationId" : "complete",
+        "parameters" : [ {
+          "name" : "provider",
+          "in" : "path",
+          "description" : "소셜 로그인 제공자",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "google", "apple" ]
+          },
+          "example" : "google"
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SocialCompleteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "로그인 성공",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseTokenResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "ID 토큰 검증 실패",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "지원하지 않는 제공자",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "입력 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "제공자 공개키 조회 실패(재시도 가능)",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ]
+      }
+    },
+    "/auth/logout" : {
+      "post" : {
+        "tags" : [ "인증" ],
+        "summary" : "로그아웃",
+        "description" : "PRO-03 / PR-04\n\n현재 세션만 종료한다. 이 토큰은 이후 401이 되고, 계정·매장 소속과 다른 기기의 세션은 유지된다.\n\n- 401 UNAUTHENTICATED: 토큰 없음·만료·위조·이미 종료된 세션\n",
+        "operationId" : "logout",
+        "responses" : {
+          "204" : {
+            "description" : "로그아웃됨"
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/test-errors/unexpected" : {
+      "get" : {
+        "tags" : [ "exception-test-controller" ],
+        "operationId" : "unexpected",
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/test-errors/param" : {
+      "get" : {
+        "tags" : [ "exception-test-controller" ],
+        "operationId" : "param",
+        "parameters" : [ {
+          "name" : "pageSize",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/test-errors/optimistic-lock" : {
+      "get" : {
+        "tags" : [ "exception-test-controller" ],
+        "operationId" : "optimisticLock",
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/test-errors/header" : {
+      "get" : {
+        "tags" : [ "exception-test-controller" ],
+        "operationId" : "header",
+        "parameters" : [ {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/test-errors/business" : {
+      "get" : {
+        "tags" : [ "exception-test-controller" ],
+        "operationId" : "business",
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        }
+      }
+    },
+    "/test-auth/whoami" : {
+      "get" : {
+        "tags" : [ "auth-test-controller" ],
+        "operationId" : "whoami",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthUser"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/substitute-requests/{requestId}" : {
+      "get" : {
+        "tags" : [ "대타 요청" ],
+        "summary" : "대타 요청 상세 (RQ-03 / AP-02)",
+        "description" : "같은 매장의 요청자·지정 대상·매니저만 볼 수 있다. 조회는 상태를 바꾸지 않는다.\nallowed_actions는 표시용이고 실제 변경 API가 다시 검사한다.\nrecipients는 요청자·매니저에게 전체, 지정 대상·후보에게는 본인 것만 나온다.\n\n- 403 FORBIDDEN: 다른 매장 / 관계없는 크루원\n- 404 NOT_FOUND: 없는 요청\n",
+        "operationId" : "get",
+        "parameters" : [ {
+          "name" : "requestId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "요청 상세",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSubstituteRequestDetail"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "권한 없음",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "없는 요청",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stores/{storeId}" : {
+      "get" : {
+        "tags" : [ "매장" ],
+        "summary" : "매장 정보 조회",
+        "description" : "PRO-01 / PR-02\n\n현재 소속 매장의 이름·실제 구성원 수·내 역할을 돌려준다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 403 FORBIDDEN: 이 매장의 활성 소속이 아님(없는 매장도 403, 존재 여부 비노출)\n- 422 VALIDATION_FAILED: storeId 형식 오류(field: store_id)\n",
+        "operationId" : "get_1",
+        "parameters" : [ {
+          "name" : "storeId",
+          "in" : "path",
+          "description" : "매장 id",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "example" : 1
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "매장 정보",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStoreResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "소속 아님",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "경로 형식 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stores/{storeId}/shifts" : {
+      "get" : {
+        "tags" : [ "근무" ],
+        "summary" : "월 달력·선택일 명단 조회",
+        "description" : "SCH-01 / CA-01, CA-02 (month 조회), SCH-02 / CA-03 (date 조회)\n\nmonth와 date 중 정확히 하나만 보낸다. 근무는 starts_at의 Asia/Seoul 날짜에 속한다(자정을 넘겨도 시작일).\n- month 조회(scope 필수): 근무가 있는 날의 중복 제거 인원(days). scope=mine이면 그 달 내 근무 목록(shifts)도,\n  scope=all이면 shifts는 빈 배열 → ShiftMonthResponse\n- date 조회: 그날 매장 전체 근무를 시작 시각 → 이름 → membership_id 순으로. scope는 무시 → ShiftDayResponse\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 403 FORBIDDEN: 이 매장의 활성 소속이 아님\n- 422 VALIDATION_FAILED: month·date 둘 다 있거나 둘 다 없음(field: month, date), month가 yyyy-MM 아님,\n  date가 yyyy-MM-dd 아님, month 조회인데 scope가 mine·all 아님(field: scope), storeId 형식 오류(field: store_id)\n",
+        "operationId" : "list",
+        "parameters" : [ {
+          "name" : "storeId",
+          "in" : "path",
+          "description" : "매장 id",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "example" : 1
+        }, {
+          "name" : "month",
+          "in" : "query",
+          "description" : "월 달력 조회(yyyy-MM, Asia/Seoul). date와 함께 보낼 수 없다",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          },
+          "example" : "2026-11"
+        }, {
+          "name" : "date",
+          "in" : "query",
+          "description" : "선택일 명단 조회(yyyy-MM-dd, Asia/Seoul). month와 함께 보낼 수 없다",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          },
+          "example" : "2026-11-11"
+        }, {
+          "name" : "scope",
+          "in" : "query",
+          "description" : "month 조회에서 필수. mine(내 근무) 또는 all(매장 전체). date 조회에서는 무시",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "mine", "all" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "month 조회면 ShiftMonthResponse, date 조회면 ShiftDayResponse",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/ApiResponseShiftMonthResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/ApiResponseShiftDayResponse"
+                  } ]
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "소속 아님",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "조회 조건 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stores/{storeId}/members" : {
+      "get" : {
+        "tags" : [ "매장" ],
+        "summary" : "매장 구성원 조회",
+        "description" : "PRO-01, SCH-03, SUB-01 / PR-02, ED-01, RQ-01\n\n현재 활성 구성원을 매니저 먼저, 한국어 이름순, 같으면 membership_id 순으로 돌려준다.\npurpose=substitute_candidates면 본인·매니저를 뺀 크루원만(대타 후보, RQ-01).\n근무 배정(ED-01)에는 매니저를 포함하는 all을 쓴다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 403 FORBIDDEN: 이 매장의 활성 소속이 아님\n- 422 VALIDATION_FAILED: purpose가 all·substitute_candidates 외 값(field: purpose),\n  storeId 형식 오류(field: store_id)\n",
+        "operationId" : "members",
+        "parameters" : [ {
+          "name" : "storeId",
+          "in" : "path",
+          "description" : "매장 id",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "example" : 1
+        }, {
+          "name" : "purpose",
+          "in" : "query",
+          "description" : "all(기본, 매니저 포함 전체) 또는 substitute_candidates(본인·매니저 제외 크루원)",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "all",
+            "enum" : [ "all", "substitute_candidates" ]
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "구성원 목록",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListMemberResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "소속 아님",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "입력 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stores/{storeId}/invite-code" : {
+      "get" : {
+        "tags" : [ "매장" ],
+        "summary" : "초대 코드 조회",
+        "description" : "STR-02 / ST-02, PR-02\n\n매장 공통 초대 코드(영문 대문자·숫자 8자리)를 돌려준다. 이 매장의 매니저만 볼 수 있다. 재발급 API는 없다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 403 FORBIDDEN: 이 매장의 활성 소속이 아니거나 매니저가 아님\n- 404 NOT_FOUND: 유효한 초대 코드가 없음\n- 422 VALIDATION_FAILED: storeId 형식 오류(field: store_id)\n",
+        "operationId" : "inviteCode",
+        "parameters" : [ {
+          "name" : "storeId",
+          "in" : "path",
+          "description" : "매장 id",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "example" : 1
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "초대 코드",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseInviteCodeResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "매니저 아님",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "코드 없음",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "경로 형식 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/shifts/{shiftId}" : {
+      "get" : {
+        "tags" : [ "근무" ],
+        "summary" : "근무 상세 조회",
+        "description" : "SCH-02 / SH-01, SH-02\n\n근무 정보·버전·진행 중 대타 요청·내가 할 수 있는 행동(allowed_actions)을 돌려준다.\nallowed_actions는 표시용이고 실제 변경 API가 다시 검사한다. 삭제할 때는 여기의 version을 expected_version으로 보낸다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 403 FORBIDDEN: 근무 매장의 활성 소속이 아님\n- 404 NOT_FOUND: 없는 근무 또는 삭제된 근무\n- 422 VALIDATION_FAILED: shiftId 형식 오류(field: shift_id)\n",
+        "operationId" : "detail",
+        "parameters" : [ {
+          "name" : "shiftId",
+          "in" : "path",
+          "description" : "근무 id",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "example" : 100
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "근무 상세",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseShiftDetailResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "소속 아님",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "없는·삭제된 근무",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "경로 형식 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "근무" ],
+        "summary" : "근무 한 건 삭제",
+        "description" : "SCH-07 / SH-02\n\n매니저가 근무 한 건을 삭제한다(과거 근무 포함). 진행 중인 대타 요청도 함께 종료하고 기록을 남긴다.\n반복 등록한 다른 날짜 근무에는 영향이 없다. 근무 상세에서 받은 version을 expected_version으로 보낸다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n- 403 FORBIDDEN: 근무 매장의 매니저가 아님\n- 404 NOT_FOUND: 없는 근무\n- 409 SHIFT_STATE_CONFLICT: 이미 삭제됨(current_state=DELETED), 버전·담당자가 바뀜(current_state=CHANGED).\n  최신 근무를 다시 조회한다\n- 422 VALIDATION_FAILED: expected_version 누락·형식 오류(field: expected_version),\n  shiftId 형식 오류(field: shift_id)\n",
+        "operationId" : "delete",
+        "parameters" : [ {
+          "name" : "shiftId",
+          "in" : "path",
+          "description" : "근무 id",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "example" : 100
+        }, {
+          "name" : "expected_version",
+          "in" : "query",
+          "description" : "근무 상세(GET /shifts/{shiftId})에서 받은 version. 다르면 409",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "example" : 0
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "삭제 결과",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseShiftDeleteResult"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "매니저 아님",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "없는 근무",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "이미 삭제됨·버전 변경. current_state에 DELETED 또는 CHANGED",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "expected_version 누락·형식 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me" : {
+      "get" : {
+        "tags" : [ "온보딩" ],
+        "summary" : "내 정보와 다음 화면 조회",
+        "description" : "COM-01, PRO-01 / CO-01~CO-05, PR-01\n\n회원·가입 단계·선택 역할·현재 소속과 앱 진입 시 이동할 화면(next_screen)을 돌려준다.\n소속 없는 계정도 허용한다. 이메일·소셜 식별자·토큰은 포함하지 않는다.\n\n- 401 UNAUTHENTICATED: 토큰 없음·만료·위조·세션 종료·탈퇴\n",
+        "operationId" : "me",
+        "responses" : {
+          "200" : {
+            "description" : "내 정보",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMeResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [ "계정" ],
+        "summary" : "계정 탈퇴",
+        "description" : "PRO-03 / PR-04\n\n확인 후 계정을 종료한다. 모든 세션이 즉시 끝나 기존 토큰은 401이 된다.\n이름·소셜 식별자·동의 기록·소속 연결을 파기하고, 다른 구성원의 근무표·기록에는 \"탈퇴한 구성원\"으로 표시된다.\n같은 소셜 계정으로 다시 로그인하면 새 회원으로 가입한다.\n\n- 401 UNAUTHENTICATED: 인증 필요(이미 탈퇴한 계정 포함)\n- 409 FUTURE_SHIFT_REMAINS: 끝나지 않은 본인 근무(예정·진행 중)가 있음. 아무것도 바뀌지 않는다\n",
+        "operationId" : "withdraw_1",
+        "responses" : {
+          "204" : {
+            "description" : "탈퇴함"
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409" : {
+            "description" : "남은 근무 있음",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/substitute-requests" : {
+      "get" : {
+        "tags" : [ "대타 요청" ],
+        "summary" : "보낸·받은 대타 요청 목록 (RQ-02)",
+        "description" : "현재 소속 매장에서 본인이 보낸(box=sent) 또는 받은(box=received) 요청. 크루원만.\n요청 생성 시각·id 내림차순 20개씩. 다음 페이지는 응답의 next_cursor를 cursor로 보낸다.\n\n- 403 FORBIDDEN: 매니저 / 활성 소속 없음\n- 422 VALIDATION_FAILED: box 누락·잘못된 값, cursor 형식 오류\n",
+        "operationId" : "list_1",
+        "parameters" : [ {
+          "name" : "box",
+          "in" : "query",
+          "description" : "sent(보낸 요청) 또는 received(받은 요청)",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "sent", "received" ]
+          }
+        }, {
+          "name" : "cursor",
+          "in" : "query",
+          "description" : "이전 응답의 next_cursor. 첫 페이지는 생략",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "요청 목록",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSubstituteRequestPage"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "권한 없음",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "입력 오류",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/notification-indicator" : {
+      "get" : {
+        "tags" : [ "알림" ],
+        "summary" : "요청 탭 점 여부",
+        "description" : "하단 바 \"요청\" 탭에 점을 표시할지. 생성 후 정확히 7일이 지난 알림은 세지 않는다.\n요청 상태(승인 대기 등)가 아니라 알림 읽음 기준이다.\n\n- 403 FORBIDDEN: 활성 매장 소속이 없음\n",
+        "operationId" : "indicator",
+        "responses" : {
+          "200" : {
+            "description" : "점 여부",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationIndicator"
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "소속 없음",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health" : {
+      "get" : {
+        "tags" : [ "health-controller" ],
+        "operationId" : "health",
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseHealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consent-documents" : {
+      "get" : {
+        "tags" : [ "온보딩" ],
+        "summary" : "동의할 약관 목록 조회",
+        "description" : "COM-03 / CO-02, CO-03\n\n종류(kind)별로 현재 유효한 최신 버전을 필수·선택 모두 돌려준다. 조회(보기·닫기)만으로 동의를 저장하지 않는다.\n필수 여부는 required 값으로 판단한다.\n\n- 401 UNAUTHENTICATED: 인증 필요\n",
+        "operationId" : "documents",
+        "responses" : {
+          "200" : {
+            "description" : "약관 목록",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListConsentDocumentResponse"
+                }
+              }
+            }
+          },
+          "401" : {
+            "description" : "인증 필요",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "RoleRequest" : {
+        "properties" : {
+          "role" : {
+            "type" : "string",
+            "description" : "가입 역할",
+            "enum" : [ "MANAGER", "CREW" ],
+            "example" : "CREW"
+          }
+        },
+        "required" : [ "role" ]
+      },
+      "ErrorBody" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "field_errors" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/FieldError"
+            }
+          },
+          "retryable" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ErrorResponse" : {
+        "properties" : {
+          "error" : {
+            "$ref" : "#/components/schemas/ErrorBody"
+          },
+          "current_state" : {
+            "type" : "string"
+          },
+          "existing_request_id" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "FieldError" : {
+        "properties" : {
+          "field" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponseMeResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/MeResponse"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "MeResponse" : {
+        "properties" : {
+          "user_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "회원 id",
+            "example" : 1
+          },
+          "display_name" : {
+            "type" : "string",
+            "description" : "가입 이름. 이름 입력 전이면 null",
+            "example" : "김도연"
+          },
+          "onboarding_stage" : {
+            "type" : "string",
+            "description" : "가입 단계",
+            "enum" : [ "CONSENT_REQUIRED", "NAME_REQUIRED", "ROLE_REQUIRED", "STORE_REQUIRED", "COMPLETED" ],
+            "example" : "COMPLETED"
+          },
+          "selected_role" : {
+            "type" : "string",
+            "description" : "가입 때 고른 역할. 선택 전이면 null. 매장 권한 판정에 쓰지 않는다(권한은 membership.role)",
+            "enum" : [ "MANAGER", "CREW" ],
+            "example" : "CREW"
+          },
+          "membership" : {
+            "$ref" : "#/components/schemas/MembershipSummary"
+          },
+          "next_screen" : {
+            "type" : "string",
+            "description" : "앱 진입 시 이동할 화면 ID",
+            "enum" : [ "CO-02", "CO-04", "CO-05", "ST-01", "ST-03", "CA-01" ],
+            "example" : "CA-01"
+          }
+        }
+      },
+      "MembershipSummary" : {
+        "description" : "현재 활성 소속. 없으면 null",
+        "properties" : {
+          "membership_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "소속 id",
+            "example" : 10
+          },
+          "store_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "매장 id",
+            "example" : 1
+          },
+          "store_name" : {
+            "type" : "string",
+            "description" : "매장명",
+            "example" : "바톤 카페"
+          },
+          "role" : {
+            "type" : "string",
+            "description" : "매장 안 역할(권한 판정 기준)",
+            "enum" : [ "MANAGER", "CREW" ],
+            "example" : "CREW"
+          },
+          "personal_color" : {
+            "type" : "string",
+            "description" : "개인 색상(#RRGGBB 대문자)",
+            "example" : "#E5484D"
+          }
+        }
+      },
+      "Meta" : {
+        "properties" : {
+          "server_time" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "NameRequest" : {
+        "properties" : {
+          "display_name" : {
+            "type" : "string",
+            "description" : "가입 이름. 앞뒤 공백 제거 후 2~15자, 줄바꿈·제어문자 불가",
+            "example" : "김도연"
+          }
+        },
+        "required" : [ "display_name" ]
+      },
+      "Body" : {
+        "properties" : {
+          "amount" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }
+      },
+      "ApiResponseResult" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/Result"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "Result" : {
+        "properties" : {
+          "target_id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "amount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "execution_no" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "processed_at" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "SampleRequest" : {
+        "properties" : {
+          "store_name" : {
+            "type" : "string",
+            "minLength" : 1
+          },
+          "max_count" : {
+            "type" : "integer",
+            "format" : "int32",
+            "minimum" : 1
+          }
+        },
+        "required" : [ "store_name" ]
+      },
+      "ApiResponseSampleRequest" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/SampleRequest"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "CreateSubstituteRequest" : {
+        "description" : "대타 요청 보내기",
+        "properties" : {
+          "shift_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "대타를 부탁할 본인 담당 근무 id"
+          },
+          "target_membership_ids" : {
+            "type" : "array",
+            "description" : "요청할 동료의 소속 id. 1명 이상, 중복 없이, 같은 매장 크루원만(본인·매니저 제외). 후보 목록은 GET /stores/{store_id}/members?purpose=substitute_candidates",
+            "items" : {
+              "type" : "integer",
+              "format" : "int64",
+              "description" : "요청할 동료의 소속 id. 1명 이상, 중복 없이, 같은 매장 크루원만(본인·매니저 제외). 후보 목록은 GET /stores/{store_id}/members?purpose=substitute_candidates"
+            }
+          }
+        },
+        "required" : [ "shift_id", "target_membership_ids" ]
+      },
+      "ApiResponseSubstituteRequestDetail" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/SubstituteRequestDetail"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "SubstituteMember" : {
+        "description" : "사람 표시. 탈퇴·연결 해제면 display_name이 \"탈퇴한 구성원\"",
+        "properties" : {
+          "membership_id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "display_name" : {
+            "type" : "string"
+          }
+        }
+      },
+      "SubstituteRecipient" : {
+        "description" : "지정 대상의 응답",
+        "properties" : {
+          "membership_id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "display_name" : {
+            "type" : "string"
+          },
+          "response" : {
+            "type" : "string",
+            "enum" : [ "PENDING", "ACCEPTED", "DECLINED", "UNAVAILABLE" ]
+          }
+        }
+      },
+      "SubstituteRequestDetail" : {
+        "description" : "RQ-03 / AP-02 요청 상세",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "WAITING", "PENDING_MANAGER", "APPROVED", "REJECTED", "ALL_DECLINED", "CANCELLED", "WITHDRAWN", "EXPIRED", "CANCELLED_SOURCE_CHANGED" ]
+          },
+          "terminal_reason" : {
+            "type" : "string",
+            "description" : "사용자 행동이 아닌 종료의 사유. 없으면 null",
+            "enum" : [ "REQUESTER_LEFT", "CANDIDATE_LEFT", "NO_ACTIVE_TARGET", "SHIFT_DELETED" ]
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "created_at" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "closed_at" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "종료 시각. 진행 중이면 null"
+          },
+          "shift" : {
+            "$ref" : "#/components/schemas/SubstituteShift"
+          },
+          "requester" : {
+            "$ref" : "#/components/schemas/SubstituteMember"
+          },
+          "candidate" : {
+            "$ref" : "#/components/schemas/SubstituteMember"
+          },
+          "my_relation" : {
+            "type" : "string",
+            "enum" : [ "REQUESTER", "CANDIDATE", "TARGET", "MANAGER" ]
+          },
+          "recipients" : {
+            "type" : "array",
+            "description" : "요청자·매니저에게는 전체, 지정 대상·후보에게는 본인 것만",
+            "items" : {
+              "$ref" : "#/components/schemas/SubstituteRecipient"
+            }
+          },
+          "allowed_actions" : {
+            "type" : "array",
+            "description" : "표시용 가능 행동: cancel / accept / reject / withdraw / approve / final_reject. 종료됐거나 근무 시작 시각이 지나면 빈 배열",
+            "items" : {
+              "type" : "string",
+              "description" : "표시용 가능 행동: cancel / accept / reject / withdraw / approve / final_reject. 종료됐거나 근무 시작 시각이 지나면 빈 배열"
+            }
+          },
+          "events" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SubstituteRequestEvent"
+            }
+          }
+        }
+      },
+      "SubstituteRequestEvent" : {
+        "description" : "진행 기록 한 건",
+        "properties" : {
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "REQUEST_CREATED", "CANDIDATE_ACCEPTED", "TARGET_DECLINED", "REQUEST_CANCELLED", "CANDIDATE_WITHDRAWN", "MANAGER_APPROVED", "MANAGER_REJECTED", "REQUEST_EXPIRED", "SOURCE_DELETED", "MEMBER_LEFT" ]
+          },
+          "actor" : {
+            "$ref" : "#/components/schemas/SubstituteMember"
+          },
+          "occurred_at" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "SubstituteShift" : {
+        "description" : "요청 생성 시점의 원본 근무 정보",
+        "properties" : {
+          "shift_id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "starts_at" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "ends_at" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "deleted" : {
+            "type" : "boolean",
+            "description" : "상세에서만 채운다. 근무가 삭제됐으면 true(\"삭제 전 정보\"로 표시). 목록에서는 null"
+          }
+        }
+      },
+      "CreateStoreRequest" : {
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "description" : "매장명. 앞뒤 공백 제거 후 1~15자, 줄바꿈·제어문자 불가",
+            "example" : "바톤 카페"
+          }
+        },
+        "required" : [ "name" ]
+      },
+      "ApiResponseCreateStoreResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/CreateStoreResponse"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "CreateStoreResponse" : {
+        "properties" : {
+          "store_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "매장 id",
+            "example" : 1
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "저장된 매장명(앞뒤 공백 제거)",
+            "example" : "바톤 카페"
+          },
+          "membership_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "생성자의 MANAGER 소속 id",
+            "example" : 10
+          },
+          "invite_code" : {
+            "type" : "string",
+            "description" : "매장 공통 초대 코드(영문 대문자·숫자 8자리)",
+            "example" : "BATON726"
+          }
+        }
+      },
+      "ShiftBatchCreateRequest" : {
+        "description" : "미리보기와 같은 입력 + preview_token",
+        "properties" : {
+          "store_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "대상 매장 id. 이 매장의 매니저만 등록할 수 있다",
+            "example" : 1
+          },
+          "assignee_membership_ids" : {
+            "type" : "array",
+            "description" : "근무자 소속 id(이 매장의 현재 구성원, 매니저 포함 가능). 1명 이상·중복 불가",
+            "example" : [ 10, 11 ],
+            "items" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          },
+          "starts_at" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "(첫) 근무 시작 시각(UTC ISO 8601, 분 단위)",
+            "example" : "2026-11-11T00:00:00Z"
+          },
+          "ends_at" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "(첫) 근무 종료 시각(UTC ISO 8601, 분 단위). 시작보다 늦고 24시간 미만. 자정을 넘기면 다음 날 시각",
+            "example" : "2026-11-11T04:00:00Z"
+          },
+          "repeat" : {
+            "$ref" : "#/components/schemas/ShiftBatchRepeat"
+          },
+          "preview_token" : {
+            "type" : "string",
+            "description" : "미리보기 응답의 preview_token(불투명 문자열, 30분 유효)",
+            "example" : "opaque_preview"
+          }
+        },
+        "required" : [ "assignee_membership_ids", "ends_at", "preview_token", "starts_at", "store_id" ]
+      },
+      "ShiftBatchRepeat" : {
+        "description" : "반복 설정. 없거나 enabled=false면 starts_at~ends_at 한 건만 만든다",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean",
+            "description" : "반복 사용 여부. null이면 false",
+            "example" : true
+          },
+          "start_date" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "반복 시작일(Asia/Seoul). 첫 근무 starts_at의 날짜와 같아야 한다",
+            "example" : "2026-11-11"
+          },
+          "end_date" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "반복 종료일(포함). 시작일에 달력상 1개월을 더한 날짜 이하",
+            "example" : "2026-12-11"
+          },
+          "weekdays" : {
+            "type" : "array",
+            "description" : "반복 요일. 1(월)~7(일), 1개 이상",
+            "example" : [ 1, 3, 5 ],
+            "items" : {
+              "type" : "integer",
+              "format" : "int32",
+              "maximum" : 7,
+              "minimum" : 1
+            }
+          }
+        }
+      },
+      "ApiResponseShiftBatchCreated" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ShiftBatchCreated"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "ShiftBatchCreated" : {
+        "properties" : {
+          "created_count" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "실제로 저장한 근무 수",
+            "example" : 26
+          },
+          "duplicate_count" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "완전 동일 중복이라 만들지 않은 근무 수",
+            "example" : 2
+          },
+          "shift_ids" : {
+            "type" : "array",
+            "description" : "저장한 근무 id. 시작 시각 → membership_id 순",
+            "example" : [ 100, 101 ],
+            "items" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          }
+        }
+      },
+      "ShiftBatchPreviewRequest" : {
+        "properties" : {
+          "store_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "대상 매장 id. 이 매장의 매니저만 등록할 수 있다",
+            "example" : 1
+          },
+          "assignee_membership_ids" : {
+            "type" : "array",
+            "description" : "근무자 소속 id(이 매장의 현재 구성원, 매니저 포함 가능). 1명 이상·중복 불가",
+            "example" : [ 10, 11 ],
+            "items" : {
+              "type" : "integer",
+              "format" : "int64"
+            }
+          },
+          "starts_at" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "(첫) 근무 시작 시각(UTC ISO 8601, 분 단위)",
+            "example" : "2026-11-11T00:00:00Z"
+          },
+          "ends_at" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "(첫) 근무 종료 시각(UTC ISO 8601, 분 단위). 시작보다 늦고 24시간 미만. 자정을 넘기면 다음 날 시각",
+            "example" : "2026-11-11T04:00:00Z"
+          },
+          "repeat" : {
+            "$ref" : "#/components/schemas/ShiftBatchRepeat"
+          }
+        },
+        "required" : [ "assignee_membership_ids", "ends_at", "starts_at", "store_id" ]
+      },
+      "ApiResponseShiftBatchPreview" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ShiftBatchPreview"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "ShiftBatchPreview" : {
+        "properties" : {
+          "preview_token" : {
+            "type" : "string",
+            "description" : "최종 등록에 그대로 보낼 불투명 문자열(30분 유효). 형식에 의존하지 말 것",
+            "example" : "opaque_preview"
+          },
+          "create_count" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "새로 만들 근무 수",
+            "example" : 26
+          },
+          "duplicate_count" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "완전 동일 중복이라 만들지 않을 근무 수",
+            "example" : 2
+          },
+          "total_count" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "계획한 전체 근무 수(create_count + duplicate_count)",
+            "example" : 28
+          },
+          "items" : {
+            "type" : "array",
+            "description" : "계획한 근무. 시작 시각 → membership_id 순",
+            "items" : {
+              "$ref" : "#/components/schemas/ShiftBatchPreviewItem"
+            }
+          }
+        }
+      },
+      "ShiftBatchPreviewItem" : {
+        "properties" : {
+          "membership_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "근무자 소속 id",
+            "example" : 10
+          },
+          "display_name" : {
+            "type" : "string",
+            "description" : "근무자 이름",
+            "example" : "김도연"
+          },
+          "local_date" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "근무 날짜(starts_at의 Asia/Seoul 날짜)",
+            "example" : "2026-11-11"
+          },
+          "starts_at" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "시작 시각(UTC)",
+            "example" : "2026-11-11T00:00:00Z"
+          },
+          "ends_at" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "종료 시각(UTC)",
+            "example" : "2026-11-11T04:00:00Z"
+          },
+          "duplicate" : {
+            "type" : "boolean",
+            "description" : "이미 같은 근무(담당자·시작·종료 동일)가 있어 만들지 않음",
+            "example" : false
+          }
+        }
+      },
+      "JoinRequest" : {
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "description" : "매장 공통 초대 코드. 영문 대문자·숫자 8자리(앞뒤 공백은 무시)",
+            "example" : "BATON726"
+          }
+        },
+        "required" : [ "code" ]
+      },
+      "ApiResponseJoinResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/JoinResponse"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "JoinResponse" : {
+        "properties" : {
+          "store_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "매장 id",
+            "example" : 1
+          },
+          "store_name" : {
+            "type" : "string",
+            "description" : "매장명",
+            "example" : "바톤 카페"
+          },
+          "membership_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "내 소속 id",
+            "example" : 11
+          },
+          "role" : {
+            "type" : "string",
+            "description" : "매장 안 역할",
+            "enum" : [ "MANAGER", "CREW" ],
+            "example" : "CREW"
+          }
+        }
+      },
+      "Agreement" : {
+        "description" : "문서별 동의 여부. 현재 유효한 필수 문서는 모두 agreed=true여야 한다. 빠진 선택 문서는 미동의로 기록",
+        "properties" : {
+          "document_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "GET /consent-documents의 document_id",
+            "example" : 1
+          },
+          "agreed" : {
+            "type" : "boolean",
+            "description" : "동의 여부",
+            "example" : true
+          }
+        },
+        "required" : [ "agreed", "document_id" ]
+      },
+      "ConsentAgreeRequest" : {
+        "properties" : {
+          "agreements" : {
+            "type" : "array",
+            "description" : "문서별 동의 여부. 현재 유효한 필수 문서는 모두 agreed=true여야 한다. 빠진 선택 문서는 미동의로 기록",
+            "items" : {
+              "$ref" : "#/components/schemas/Agreement"
+            }
+          }
+        },
+        "required" : [ "agreements" ]
+      },
+      "SocialCompleteRequest" : {
+        "properties" : {
+          "id_token" : {
+            "type" : "string",
+            "description" : "Google·Apple SDK가 준 ID 토큰(JWT) 원문. 최대 8192자",
+            "example" : "google_id_token_example",
+            "maxLength" : 8192,
+            "minLength" : 0
+          }
+        },
+        "required" : [ "id_token" ]
+      },
+      "ApiResponseTokenResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/TokenResponse"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "TokenResponse" : {
+        "properties" : {
+          "access_token" : {
+            "type" : "string",
+            "description" : "BATON 액세스 토큰. Authorization: Bearer {access_token}으로 보낸다",
+            "example" : "access_token_example"
+          },
+          "expires_in" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "액세스 토큰 수명(초). 만료되면 다시 소셜 로그인한다(refresh 없음)",
+            "example" : 1209600
+          },
+          "onboarding_stage" : {
+            "type" : "string",
+            "description" : "현재 가입 단계. 다음 화면은 GET /me의 next_screen으로 판단한다",
+            "enum" : [ "CONSENT_REQUIRED", "NAME_REQUIRED", "ROLE_REQUIRED", "STORE_REQUIRED", "COMPLETED" ],
+            "example" : "CONSENT_REQUIRED"
+          }
+        }
+      },
+      "AuthUser" : {
+        "properties" : {
+          "user_id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "session_id" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "ApiResponseStoreResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/StoreResponse"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "StoreResponse" : {
+        "properties" : {
+          "store_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "매장 id",
+            "example" : 1
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "매장명",
+            "example" : "바톤 카페"
+          },
+          "member_count" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "현재 활성 구성원 수(매니저 포함)",
+            "example" : 5
+          },
+          "my_role" : {
+            "type" : "string",
+            "description" : "이 매장에서 내 역할",
+            "enum" : [ "MANAGER", "CREW" ],
+            "example" : "MANAGER"
+          }
+        }
+      },
+      "ApiResponseShiftMonthResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ShiftMonthResponse"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "AssigneeResponse" : {
+        "description" : "담당자",
+        "properties" : {
+          "membership_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "담당자 소속 id",
+            "example" : 10
+          },
+          "display_name" : {
+            "type" : "string",
+            "description" : "담당자 이름. 탈퇴했으면 \"탈퇴한 구성원\"",
+            "example" : "김도연"
+          },
+          "personal_color" : {
+            "type" : "string",
+            "description" : "개인 색상(#RRGGBB 대문자). 탈퇴했으면 #B0B4BA",
+            "example" : "#E5484D"
+          },
+          "is_me" : {
+            "type" : "boolean",
+            "description" : "조회한 사용자 본인 여부",
+            "example" : true
+          }
+        }
+      },
+      "DayCountResponse" : {
+        "properties" : {
+          "date" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "날짜(Asia/Seoul)",
+            "example" : "2026-11-11"
+          },
+          "headcount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "그날 근무자 수(담당자 중복 제거)",
+            "example" : 2
+          }
+        }
+      },
+      "ShiftItemResponse" : {
+        "properties" : {
+          "shift_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "근무 id",
+            "example" : 100
+          },
+          "starts_at" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "시작 시각(UTC)",
+            "example" : "2026-11-11T00:00:00Z"
+          },
+          "ends_at" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "종료 시각(UTC). 자정을 넘기면 다음 날",
+            "example" : "2026-11-11T04:00:00Z"
+          },
+          "local_date" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "근무 날짜(starts_at의 Asia/Seoul 날짜)",
+            "example" : "2026-11-11"
+          },
+          "assignee" : {
+            "$ref" : "#/components/schemas/AssigneeResponse"
+          }
+        }
+      },
+      "ShiftMonthResponse" : {
+        "properties" : {
+          "month" : {
+            "type" : "string",
+            "description" : "조회한 월(yyyy-MM, Asia/Seoul)",
+            "example" : "2026-11"
+          },
+          "days" : {
+            "type" : "array",
+            "description" : "근무가 있는 날만, 날짜 오름차순. scope=mine이면 내 근무 기준, all이면 매장 전체 기준",
+            "items" : {
+              "$ref" : "#/components/schemas/DayCountResponse"
+            }
+          },
+          "shifts" : {
+            "type" : "array",
+            "description" : "scope=mine이면 그 달 내 근무 전체(시작 시각 → shift_id 순), scope=all이면 빈 배열",
+            "items" : {
+              "$ref" : "#/components/schemas/ShiftItemResponse"
+            }
+          }
+        }
+      },
+      "ApiResponseShiftDayResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ShiftDayResponse"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "ShiftDayResponse" : {
+        "properties" : {
+          "date" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "조회한 날짜(Asia/Seoul)",
+            "example" : "2026-11-11"
+          },
+          "headcount" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "그날 근무자 수(담당자 중복 제거)",
+            "example" : 2
+          },
+          "shift_count" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "그날 근무 건수",
+            "example" : 2
+          },
+          "shifts" : {
+            "type" : "array",
+            "description" : "그날 매장 전체 근무. 시작 시각 → 이름 → membership_id 순, 개수 제한 없음",
+            "items" : {
+              "$ref" : "#/components/schemas/ShiftItemResponse"
+            }
+          }
+        }
+      },
+      "ApiResponseListMemberResponse" : {
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MemberResponse"
+            }
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "MemberResponse" : {
+        "properties" : {
+          "membership_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "소속 id",
+            "example" : 10
+          },
+          "display_name" : {
+            "type" : "string",
+            "description" : "구성원 이름",
+            "example" : "김도연"
+          },
+          "role" : {
+            "type" : "string",
+            "description" : "매장 안 역할",
+            "enum" : [ "MANAGER", "CREW" ],
+            "example" : "CREW"
+          },
+          "personal_color" : {
+            "type" : "string",
+            "description" : "개인 색상(#RRGGBB 대문자)",
+            "example" : "#E5484D"
+          },
+          "is_me" : {
+            "type" : "boolean",
+            "description" : "본인 여부",
+            "example" : true
+          }
+        }
+      },
+      "ApiResponseInviteCodeResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/InviteCodeResponse"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "InviteCodeResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string",
+            "description" : "매장 공통 초대 코드(영문 대문자·숫자 8자리)",
+            "example" : "BATON726"
+          }
+        }
+      },
+      "ActiveRequestResponse" : {
+        "description" : "이 근무의 진행 중 대타 요청. 없으면 null",
+        "properties" : {
+          "request_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "대타 요청 id",
+            "example" : 200
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "대타 요청 상태",
+            "example" : "PENDING_MANAGER"
+          },
+          "viewer_is_requester" : {
+            "type" : "boolean",
+            "description" : "조회한 사용자가 요청자인지",
+            "example" : false
+          },
+          "pending_manager_approval" : {
+            "type" : "boolean",
+            "description" : "매니저 최종 승인 대기 중인지",
+            "example" : true
+          }
+        }
+      },
+      "ApiResponseShiftDetailResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ShiftDetailResponse"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "ShiftDetailResponse" : {
+        "properties" : {
+          "shift_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "근무 id",
+            "example" : 100
+          },
+          "starts_at" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "시작 시각(UTC)",
+            "example" : "2026-11-11T00:00:00Z"
+          },
+          "ends_at" : {
+            "type" : "string",
+            "format" : "date-time",
+            "description" : "종료 시각(UTC). 자정을 넘기면 다음 날",
+            "example" : "2026-11-11T04:00:00Z"
+          },
+          "local_date" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "근무 날짜(starts_at의 Asia/Seoul 날짜)",
+            "example" : "2026-11-11"
+          },
+          "assignee" : {
+            "$ref" : "#/components/schemas/AssigneeResponse"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "근무 버전. 삭제 시 expected_version으로 보낸다",
+            "example" : 0
+          },
+          "is_mine" : {
+            "type" : "boolean",
+            "description" : "내 담당 근무 여부",
+            "example" : true
+          },
+          "is_started" : {
+            "type" : "boolean",
+            "description" : "서버 시각 기준 시작했는지 여부",
+            "example" : false
+          },
+          "active_request" : {
+            "$ref" : "#/components/schemas/ActiveRequestResponse"
+          },
+          "allowed_actions" : {
+            "type" : "array",
+            "description" : "표시용 가능 행동. 실제 변경 API가 다시 검사한다.\n매니저: delete, 승인 대기 요청이 있으면 view_approval_request 추가.\n크루원 본인 근무: 진행 중 요청이 있으면 view_request, 없고 시작 전이면 request_substitute. 그 밖에는 빈 배열",
+            "example" : [ "request_substitute" ],
+            "items" : {
+              "type" : "string",
+              "enum" : [ "request_substitute", "view_request", "delete", "view_approval_request" ]
+            }
+          }
+        }
+      },
+      "ApiResponseSubstituteRequestPage" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/SubstituteRequestPage"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "SubstituteRequestPage" : {
+        "description" : "커서 목록",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SubstituteRequestSummary"
+            }
+          },
+          "next_cursor" : {
+            "type" : "string",
+            "description" : "다음 페이지 커서(불투명 문자열). 없으면 null"
+          },
+          "has_more" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "SubstituteRequestSummary" : {
+        "description" : "RQ-02 목록 카드",
+        "properties" : {
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "terminal_reason" : {
+            "type" : "string"
+          },
+          "shift" : {
+            "$ref" : "#/components/schemas/SubstituteShift"
+          },
+          "requester" : {
+            "$ref" : "#/components/schemas/SubstituteMember"
+          },
+          "candidate" : {
+            "$ref" : "#/components/schemas/SubstituteMember"
+          },
+          "my_response" : {
+            "type" : "string",
+            "description" : "받은 요청 목록에서만 본인 응답. 보낸 요청 목록에서는 null"
+          },
+          "unchecked" : {
+            "type" : "boolean",
+            "description" : "카드 점. 이 요청에 대해 아직 확인하지 않은 본인 알림(최근 7일)이 있으면 true. 상세를 열 때 POST /me/substitute-requests/{id}/check로 지운다"
+          },
+          "created_at" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "ApiResponseNotificationIndicator" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/NotificationIndicator"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "NotificationIndicator" : {
+        "properties" : {
+          "has_unread" : {
+            "type" : "boolean",
+            "description" : "최근 7일 보관 중 미읽음 알림이 있으면 true. 하단 바 \"요청\" 탭에 점을 표시한다"
+          }
+        }
+      },
+      "ApiResponseHealthResponse" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/HealthResponse"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "HealthResponse" : {
+        "properties" : {
+          "status" : {
+            "type" : "string"
+          }
+        }
+      },
+      "ApiResponseListConsentDocumentResponse" : {
+        "properties" : {
+          "data" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ConsentDocumentResponse"
+            }
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "ConsentDocumentResponse" : {
+        "properties" : {
+          "document_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "약관 문서 id. 동의 저장 시 document_id로 보낸다",
+            "example" : 1
+          },
+          "kind" : {
+            "type" : "string",
+            "description" : "문서 종류(영문 대문자·_). 종류 목록은 미정",
+            "example" : "TERMS_OF_SERVICE"
+          },
+          "version" : {
+            "type" : "integer",
+            "format" : "int32",
+            "description" : "문서 버전",
+            "example" : 1
+          },
+          "title" : {
+            "type" : "string",
+            "description" : "문서 제목",
+            "example" : "서비스 이용약관"
+          },
+          "required" : {
+            "type" : "boolean",
+            "description" : "필수 동의 여부. true인 문서에 모두 동의해야 다음 단계로 간다",
+            "example" : true
+          },
+          "body_reference" : {
+            "type" : "string",
+            "description" : "약관 본문 URL(https 절대 경로). CO-03에서 이 URL의 본문을 표시한다",
+            "example" : "https://example.com/baton/terms/terms-of-service/v1"
+          }
+        }
+      },
+      "ApiResponseShiftDeleteResult" : {
+        "properties" : {
+          "data" : {
+            "$ref" : "#/components/schemas/ShiftDeleteResult"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/Meta"
+          }
+        }
+      },
+      "ShiftDeleteResult" : {
+        "properties" : {
+          "shift_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "삭제한 근무 id",
+            "example" : 100
+          },
+          "deleted" : {
+            "type" : "boolean",
+            "description" : "삭제 여부(성공 응답에서는 항상 true)",
+            "example" : true
+          },
+          "closed_request_id" : {
+            "type" : "integer",
+            "format" : "int64",
+            "description" : "함께 종료한 진행 중 대타 요청 id. 없으면 null",
+            "example" : 200
+          }
+        }
+      }
+    },
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "type" : "http",
+        "scheme" : "bearer",
+        "bearerFormat" : "JWT"
+      }
+    }
+  }
+}

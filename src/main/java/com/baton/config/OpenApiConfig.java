@@ -1,6 +1,7 @@
 package com.baton.config;
 
 import com.baton.auth.security.CurrentUser;
+import com.baton.auth.security.TestUserAuthenticationFilter;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import io.swagger.v3.core.jackson.ModelResolver;
@@ -10,14 +11,17 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springdoc.core.utils.SpringDocUtils;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 @Configuration(proxyBeanMethods = false)
 public class OpenApiConfig {
 
     private static final String BEARER_AUTH = "bearerAuth";
+    static final String TEST_USER_AUTH = "testUserId";
 
     static {
         // @CurrentUser 파라미터는 요청 입력이 아니므로 문서에서 숨긴다
@@ -43,5 +47,25 @@ public class OpenApiConfig {
                         .scheme("bearer")
                         .bearerFormat("JWT")))
                 .addSecurityItem(new SecurityRequirement().addList(BEARER_AUTH));
+    }
+
+    /**
+     * local 프로필 전용: Swagger UI의 Authorize 창에 X-Test-User-Id 입력칸을 띄운다.
+     * Bearer와 둘 중 하나만 넣으면 된다(보안 요구사항을 OR로 추가). 인증 필터 자체는 TestUserAuthConfig가 등록한다.
+     */
+    @Bean
+    @Profile("local")
+    public OpenApiCustomizer testUserHeaderOpenApiCustomizer() {
+        return openApi -> {
+            if (openApi.getComponents() == null) {
+                openApi.setComponents(new Components());
+            }
+            openApi.getComponents().addSecuritySchemes(TEST_USER_AUTH, new SecurityScheme()
+                    .type(SecurityScheme.Type.APIKEY)
+                    .in(SecurityScheme.In.HEADER)
+                    .name(TestUserAuthenticationFilter.HEADER)
+                    .description("local 프로필 전용 테스트 인증. 활성 회원의 user_id를 넣는다(예: 1)"));
+            openApi.addSecurityItem(new SecurityRequirement().addList(TEST_USER_AUTH));
+        };
     }
 }
