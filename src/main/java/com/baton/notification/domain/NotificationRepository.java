@@ -54,4 +54,20 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             """)
     List<Long> findUncheckedRequestIds(@Param("recipient") Long recipientMembershipId,
                                        @Param("requestIds") Collection<Long> requestIds, @Param("now") Instant now);
+
+    /**
+     * 보관 기간(생성 후 168시간)이 끝난 알림 삭제. 조회·점 계산은 이미 expires_at > now로 제외하므로
+     * 삭제가 늦어도 노출되지 않는다. 삭제한 행 수를 돌려준다.
+     * 읽음·확인 UPDATE와 같은 규칙으로 id 오름차순으로 잠근 뒤 지운다(만료 경계의 행이 겹쳐도 교착 방지).
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            DELETE FROM notifications
+            WHERE id IN (
+                SELECT id FROM notifications
+                WHERE expires_at <= :now
+                ORDER BY id
+                FOR UPDATE)
+            """, nativeQuery = true)
+    int deleteExpired(@Param("now") Instant now);
 }
