@@ -1,6 +1,7 @@
 package com.baton.integration.stub;
 
 import com.baton.integration.ShiftAssignment;
+import com.baton.integration.StoreManagerQuery;
 import jakarta.persistence.EntityManager;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -20,5 +21,12 @@ public class IntegrationStubConfig {
     @ConditionalOnMissingBean(ShiftAssignment.class)
     public ShiftAssignment shiftAssignmentStub(EntityManager entityManager) {
         return new ShiftAssignmentStub(entityManager);
+    }
+
+    /** A가 StoreManagerQuery 구현을 추가하면 이 빈은 등록되지 않는다. */
+    @Bean
+    @ConditionalOnMissingBean(StoreManagerQuery.class)
+    public StoreManagerQuery storeManagerQueryStub(EntityManager entityManager) {
+        return new StoreManagerQueryStub(entityManager);
     }
 }

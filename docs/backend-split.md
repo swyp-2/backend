@@ -69,6 +69,14 @@ A가 구현, B가 호출:
         String displayNameOf(long membershipId);
     }
     public record ActiveMembership(long membershipId, long storeId, long userId, String role) {}
+
+    // [2026-11-10 B 추가] 실제 파일: com.baton.integration.StoreManagerQuery → **A 구현 요청**
+    // 대타 처리 결과 알림의 "소속 매니저" 수신자 계산용. A 구현 전까지 B의 스텁(StoreManagerQueryStub)이 쓰인다
+    public interface StoreManagerQuery {
+        // 매장의 ACTIVE MANAGER 소속, id 오름차순. 잠그지 않음. 없으면 빈 목록
+        List<ActiveMembership> findActiveManagers(long storeId);
+    }
+
 ## B 데이터 모델: 대타·알림 (V202611092000__b_substitute_notification.sql)
 
 ### 테이블
@@ -145,6 +153,47 @@ my_response(받은 요청만, 보낸 요청은 null), created_at. 정렬은 생�
 shift(lockSnapshot) → substitute_request. 소속을 잠그므로 A의 나가기·탈퇴와 동시에 일어나도 정리 대상에서 빠지지 않는다.
 
 A에게 영향: Lifecycle.findActiveByShift가 실제 값을 돌려준다 (근무 상세 SH-01/02에서 사용).
+
+## B API: 대타 요청 상태 전이 (2026-11-10)
+
+모두 `POST /substitute-requests/{id}/{행동}`, 본문 없음, Idempotency-Key 필수, 응답 data는 처리 후 최신 상세.
+
+| 행동 | 누가 | 상태 | 결과 | 결과 알림 |
+| --- | --- | --- | --- | --- |
+| accept | 지정 크루원(거절했던 대상 포함) | WAITING | PENDING_MANAGER, 후보 확정 | 요청자·후보·매니저 |
+| reject | 미응답 지정 크루원 | WAITING | 그대로, 미응답 대상이 없으면 ALL_DECLINED | 요청자·매니저 |
+| cancel | 요청자 | WAITING·PENDING_MANAGER | CANCELLED | 요청자·직전 후보·매니저 |
+| withdraw | 현재 후보 | PENDING_MANAGER | WITHDRAWN | 요청자·후보·매니저 |
+| approve | 소속 매니저 | PENDING_MANAGER | APPROVED + 근무 담당자 → 후보(ShiftAssignment.reassign) | 요청자·후보·매니저 |
+| final-reject | 소속 매니저 | PENDING_MANAGER | REJECTED | 요청자·후보·매니저 |
+
+- 알림은 지금 활성 소속인 사람만, 같은 사람은 1건. "매니저"는 그 매장의 활성 매니저 전원(처리한 매니저 포함)
+- 진행 기록 kind: CANDIDATE_ACCEPTED, TARGET_DECLINED(전원 거절이면 after_status=ALL_DECLINED), REQUEST_CANCELLED,
+  CANDIDATE_WITHDRAWN, MANAGER_APPROVED, MANAGER_REJECTED
+
+에러
+| 상황 | 에러 |
+| --- | --- |
+| 관계·역할이 아님(지정 대상 아님, 요청자 아님, 후보 아님, 매니저 아님), 다른 매장 | 403 FORBIDDEN |
+| 없는 요청 | 404 NOT_FOUND |
+| 이미 처리됨·종료됨·다른 후보 확정·후보가 매장을 나감, 처리하는 사이 다른 사람이 수락함 | 409 REQUEST_STATE_CONFLICT + current_state |
+| 근무 시작 시각 이후(스케줄러가 EXPIRED로 바꾸기 전 포함), 6개 행동 모두 | 409 REQUEST_EXPIRED + current_state |
+| 승인 시 근무 삭제·담당자·버전 변경 / 후보에게 완전히 같은 근무가 이미 있음(shifts_identical_live_uk) | 409 SHIFT_STATE_CONFLICT |
+| 키 누락·형식 오류 / 같은 키를 다른 요청에 사용 | 422 VALIDATION_FAILED / IDEMPOTENCY_KEY_REUSED |
+
+결정 (2026-11-10 B)
+- 시작 시각 이후에는 수락·승인뿐 아니라 6개 행동 모두 REQUEST_EXPIRED (allowed_actions가 빈 배열인 것과 맞춤)
+- 요청 본문에 expected_version을 받지 않는다. 잠금 후 상태·관계·시작 시각을 서버가 다시 검사한다
+- 후보 중복 근무 충돌은 새 에러 코드 없이 SHIFT_STATE_CONFLICT + 메시지 "후보에게 이미 같은 시간의 근무가 있어요..."
+
+잠금 순서: idempotency_records → 요청자·후보·행위 크루원 membership(id 오름차순, lockActiveById) →
+(승인만) shift(lockSnapshot) → substitute_request(FOR UPDATE). 매니저 본인 소속은 잠그지 않는다.
+
+A에게 영향
+- StoreManagerQuery 구현 요청 (위 인터페이스 절)
+- ShiftAssignment.reassign 구현 시: 후보에게 완전히 같은 근무가 있으면 shifts_identical_live_uk 위반이 난다.
+  B는 예외 원인 체인에 인덱스 이름이 있으면 SHIFT_STATE_CONFLICT로 바꾸므로, A 구현은 이 예외를 삼키거나 다른 메시지로
+  감싸지 말고 그대로 던져 주면 된다
 
 ## Swagger(OpenAPI) 문서 (2026-11-09 B)
 - 주소: /swagger-ui.html (JSON은 /v3/api-docs)

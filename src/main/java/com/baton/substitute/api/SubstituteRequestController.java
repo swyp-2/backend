@@ -10,6 +10,7 @@ import com.baton.common.idempotency.IdempotencyService;
 import com.baton.substitute.application.RequestBox;
 import com.baton.substitute.application.SubstituteRequestCommandService;
 import com.baton.substitute.application.SubstituteRequestQueryService;
+import com.baton.substitute.application.SubstituteRequestTransitionService;
 import com.baton.substitute.application.SubstituteRequestViews.Detail;
 import com.baton.substitute.application.SubstituteRequestViews.Page;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +23,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.Clock;
 import java.util.List;
+import java.util.function.BiConsumer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,13 +33,17 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "대타 요청", description = "대타 요청 생성·상세·보낸/받은 목록")
+@Tag(name = "대타 요청", description = "대타 요청 생성·상세·보낸/받은 목록·수락/거절/취소/철회/최종 승인/최종 거절")
 @RestController
 @RequiredArgsConstructor
 public class SubstituteRequestController {
 
+    private static final String KEY_DESCRIPTION =
+            "중복 제출 방지 키. 영문·숫자·-·_ 1~100자. 같은 행동을 재시도할 때는 같은 키를 다시 보낸다";
+
     private final SubstituteRequestCommandService commandService;
     private final SubstituteRequestQueryService queryService;
+    private final SubstituteRequestTransitionService transitionService;
     private final IdempotencyService idempotencyService;
     private final Clock clock;
 
@@ -132,6 +138,130 @@ public class SubstituteRequestController {
                                   @Parameter(description = "이전 응답의 next_cursor. 첫 페이지는 생략")
                                   @RequestParam(required = false) String cursor) {
         return ApiResponse.ok(queryService.list(authUser.userId(), RequestBox.parse(box), cursor), clock);
+    }
+
+    // 상태 전이(RQ-03 / AP-02). 본문 없음, Idempotency-Key 필수, 응답은 처리 후 최신 상세 ----------------------------
+
+    @Operation(summary = "대타 수락 (RQ-03)", description = """
+            지정된 크루원의 첫 수락. WAITING → PENDING_MANAGER, 수락자가 후보가 된다. 근무 담당자는 바뀌지 않는다.
+            거절했던 대상도 요청이 WAITING이면 다시 수락할 수 있다. 동시 수락은 한 명만 성공한다.
+
+            - 403 FORBIDDEN: 지정 대상이 아님 / 소속 없음
+            - 409 REQUEST_STATE_CONFLICT: 이미 다른 후보가 있음·종료됨(current_state)
+            - 409 REQUEST_EXPIRED: 근무 시작 시각이 지남
+            """)
+    @TransitionErrorResponses
+    @PostMapping("/substitute-requests/{requestId}/accept")
+    public ApiResponse<Detail> accept(
+            @CurrentUser AuthUser authUser, @PathVariable long requestId,
+            @Parameter(in = ParameterIn.HEADER, required = true, description = KEY_DESCRIPTION)
+            @RequestHeader(name = IdempotencyService.HEADER, required = false) String key) {
+        return transition(authUser, requestId, key, IdempotencyScope.SUBSTITUTE_REQUEST_ACCEPT,
+                transitionService::accept);
+    }
+
+    @Operation(summary = "대타 거절 (RQ-03)", description = """
+            미응답 지정 크루원의 거절. 확인 팝업 없이 바로 호출한다. 다른 대상의 응답 기회는 유지되고,
+            미응답 대상이 더 없으면 ALL_DECLINED로 종료한다.
+
+            - 403 FORBIDDEN: 지정 대상이 아님 / 소속 없음
+            - 409 REQUEST_STATE_CONFLICT: 이미 응답함·후보 확정·종료됨(current_state)
+            - 409 REQUEST_EXPIRED: 근무 시작 시각이 지남
+            """)
+    @TransitionErrorResponses
+    @PostMapping("/substitute-requests/{requestId}/reject")
+    public ApiResponse<Detail> reject(
+            @CurrentUser AuthUser authUser, @PathVariable long requestId,
+            @Parameter(in = ParameterIn.HEADER, required = true, description = KEY_DESCRIPTION)
+            @RequestHeader(name = IdempotencyService.HEADER, required = false) String key) {
+        return transition(authUser, requestId, key, IdempotencyScope.SUBSTITUTE_REQUEST_REJECT,
+                transitionService::reject);
+    }
+
+    @Operation(summary = "보낸 요청 취소 (RQ-03)", description = """
+            요청자의 취소. WAITING·PENDING_MANAGER → CANCELLED. 근무 담당자는 바뀌지 않는다.
+
+            - 403 FORBIDDEN: 요청자가 아님
+            - 409 REQUEST_STATE_CONFLICT: 이미 종료됨 / 처리하는 사이 다른 동료가 수락함(current_state)
+            - 409 REQUEST_EXPIRED: 근무 시작 시각이 지남
+            """)
+    @TransitionErrorResponses
+    @PostMapping("/substitute-requests/{requestId}/cancel")
+    public ApiResponse<Detail> cancel(
+            @CurrentUser AuthUser authUser, @PathVariable long requestId,
+            @Parameter(in = ParameterIn.HEADER, required = true, description = KEY_DESCRIPTION)
+            @RequestHeader(name = IdempotencyService.HEADER, required = false) String key) {
+        return transition(authUser, requestId, key, IdempotencyScope.SUBSTITUTE_REQUEST_CANCEL,
+                transitionService::cancel);
+    }
+
+    @Operation(summary = "수락 철회 (RQ-03)", description = """
+            현재 후보의 수락 철회. PENDING_MANAGER → WITHDRAWN. 다른 동료에게 자동으로 다시 모집하지 않는다.
+
+            - 403 FORBIDDEN: 현재 후보가 아님
+            - 409 REQUEST_STATE_CONFLICT: 이미 종료됨(current_state)
+            - 409 REQUEST_EXPIRED: 근무 시작 시각이 지남
+            """)
+    @TransitionErrorResponses
+    @PostMapping("/substitute-requests/{requestId}/withdraw")
+    public ApiResponse<Detail> withdraw(
+            @CurrentUser AuthUser authUser, @PathVariable long requestId,
+            @Parameter(in = ParameterIn.HEADER, required = true, description = KEY_DESCRIPTION)
+            @RequestHeader(name = IdempotencyService.HEADER, required = false) String key) {
+        return transition(authUser, requestId, key, IdempotencyScope.SUBSTITUTE_REQUEST_WITHDRAW,
+                transitionService::withdraw);
+    }
+
+    @Operation(summary = "대타 최종 승인 (AP-02)", description = """
+            소속 매니저의 최종 승인. PENDING_MANAGER → APPROVED, 그 근무 한 건의 담당자를 후보로 바꾼다.
+            요청 상태·담당자 변경·처리 기록·결과 알림을 한 트랜잭션에 저장한다.
+
+            - 403 FORBIDDEN: 매니저가 아님 / 다른 매장
+            - 409 REQUEST_STATE_CONFLICT: WAITING·종료됨, 후보가 매장을 나감(current_state)
+            - 409 REQUEST_EXPIRED: 근무 시작 시각이 지남
+            - 409 SHIFT_STATE_CONFLICT: 근무가 삭제·변경됨, 후보에게 같은 시간 근무가 이미 있음
+            """)
+    @TransitionErrorResponses
+    @PostMapping("/substitute-requests/{requestId}/approve")
+    public ApiResponse<Detail> approve(
+            @CurrentUser AuthUser authUser, @PathVariable long requestId,
+            @Parameter(in = ParameterIn.HEADER, required = true, description = KEY_DESCRIPTION)
+            @RequestHeader(name = IdempotencyService.HEADER, required = false) String key) {
+        return transition(authUser, requestId, key, IdempotencyScope.SUBSTITUTE_REQUEST_APPROVE,
+                transitionService::approve);
+    }
+
+    @Operation(summary = "대타 최종 거절 (AP-02)", description = """
+            소속 매니저의 최종 거절. PENDING_MANAGER → REJECTED. 담당자는 바뀌지 않는다. 사유 입력은 없다.
+
+            - 403 FORBIDDEN: 매니저가 아님 / 다른 매장
+            - 409 REQUEST_STATE_CONFLICT: WAITING·종료됨(current_state)
+            - 409 REQUEST_EXPIRED: 근무 시작 시각이 지남
+            """)
+    @TransitionErrorResponses
+    @PostMapping("/substitute-requests/{requestId}/final-reject")
+    public ApiResponse<Detail> finalReject(
+            @CurrentUser AuthUser authUser, @PathVariable long requestId,
+            @Parameter(in = ParameterIn.HEADER, required = true, description = KEY_DESCRIPTION)
+            @RequestHeader(name = IdempotencyService.HEADER, required = false) String key) {
+        return transition(authUser, requestId, key, IdempotencyScope.SUBSTITUTE_REQUEST_FINAL_REJECT,
+                transitionService::finalReject);
+    }
+
+    private ApiResponse<Detail> transition(AuthUser authUser, long requestId, String key, IdempotencyScope scope,
+                                           BiConsumer<Long, Long> action) {
+        Detail result = idempotencyService.execute(
+                new IdempotencyCommand(authUser.userId(), scope, key, new TransitionPayload(requestId)),
+                Detail.class,
+                () -> {
+                    action.accept(authUser.userId(), requestId);
+                    return queryService.getDetail(authUser.userId(), requestId);
+                });
+        return ApiResponse.ok(result, clock);
+    }
+
+    /** 상태 전이 멱등성 지문용 요청 내용. 같은 키를 다른 요청에 쓰면 IDEMPOTENCY_KEY_REUSED. */
+    record TransitionPayload(long requestId) {
     }
 
     /** 멱등성 지문용 요청 내용(필드 순서 고정). */
