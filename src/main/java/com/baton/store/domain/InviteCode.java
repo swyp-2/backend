@@ -48,14 +48,4 @@ public class InviteCode {
         inviteCode.createdAt = now;
         return inviteCode;
     }
-
-    public boolean isValid() {
-        return invalidatedAt == null;
-    }
-
-    public void invalidate(Instant now) {
-        if (invalidatedAt == null) {
-            invalidatedAt = now;
-        }
-    }
 }

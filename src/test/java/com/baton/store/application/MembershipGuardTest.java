@@ -2,10 +2,12 @@ package com.baton.store.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.baton.common.BusinessException;
 import com.baton.common.ErrorCode;
 import com.baton.integration.ActiveMembership;
+import com.baton.integration.StoreManagerQuery;
 import com.baton.member.domain.Role;
 import com.baton.member.domain.User;
 import com.baton.member.domain.UserRepository;
@@ -27,6 +29,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class MembershipGuardTest {
 
     @Autowired MembershipGuard guard;
+    @Autowired StoreManagerQuery storeManagerQuery;
     @Autowired UserRepository userRepository;
     @Autowired StoreRepository storeRepository;
     @Autowired MembershipRepository membershipRepository;
@@ -104,6 +107,38 @@ class MembershipGuardTest {
         assertThat(notActive).isEmpty();
         assertThatThrownBy(() -> guard.lockActiveById(active.getId()))
                 .isInstanceOf(IllegalTransactionStateException.class);
+    }
+
+    @Test
+    void 주입되는_StoreManagerQuery는_A의_실제_구현이다() {
+        assertThat(storeManagerQuery).isInstanceOf(MembershipGuard.class);
+    }
+
+    @Test
+    void 소속_매니저는_그_매장_활성_매니저만_id순으로_돌려준다() {
+        long storeId = newStore();
+        Membership first = join(storeId, newNamedUser("매니저일"), Role.MANAGER);
+        join(storeId, newNamedUser("크루원"), Role.CREW);
+        Membership second = join(storeId, newNamedUser("매니저이"), Role.MANAGER);
+        Membership left = join(storeId, newNamedUser("나간매니저"), Role.MANAGER);
+        left.leave(clock.instant());
+        membershipRepository.saveAndFlush(left);
+        Membership withdrawn = join(storeId, newNamedUser("탈퇴매니저"), Role.MANAGER);
+        withdrawn.withdraw(clock.instant());
+        membershipRepository.saveAndFlush(withdrawn);
+        join(newStore(), newNamedUser("다른매장매니저"), Role.MANAGER);
+
+        assertThat(storeManagerQuery.findActiveManagers(storeId))
+                .extracting(ActiveMembership::membershipId, ActiveMembership::role)
+                .containsExactly(tuple(first.getId(), "MANAGER"), tuple(second.getId(), "MANAGER"));
+    }
+
+    @Test
+    void 매니저가_없는_매장이면_빈_목록() {
+        long storeId = newStore();
+        join(storeId, newNamedUser("크루원"), Role.CREW);
+
+        assertThat(storeManagerQuery.findActiveManagers(storeId)).isEmpty();
     }
 
     @Test
