@@ -68,7 +68,7 @@ class SubstituteRequestTransitionApiTest {
     // 수락 ---------------------------------------------------------------------------------------
 
     @Test
-    void 수락하면_후보가_확정되고_담당자는_그대로이며_요청자_후보_매니저에게_알림() throws Exception {
+    void 수락하면_후보가_확정되고_담당자는_그대로이며_수락한_본인을_뺀_요청자_매니저에게_알림() throws Exception {
         JsonNode data = api.transitionOk(target1User, requestId, "accept");
 
         assertThat(data.get("status").asText()).isEqualTo("PENDING_MANAGER");
@@ -78,7 +78,7 @@ class SubstituteRequestTransitionApiTest {
         assertThat(eventKinds(data)).containsExactly("REQUEST_CREATED", "CANDIDATE_ACCEPTED");
         assertThat(assignee()).isEqualTo(requesterId);
         assertThat(notified(RequestEventKind.CANDIDATE_ACCEPTED))
-                .containsExactlyInAnyOrder(requesterId, target1Id, managerId);
+                .containsExactlyInAnyOrder(requesterId, managerId);
     }
 
     @Test
@@ -169,7 +169,7 @@ class SubstituteRequestTransitionApiTest {
         assertThat(data.get("allowed_actions")).isEmpty();
         assertThat(assignee()).isEqualTo(requesterId);
         assertThat(notified(RequestEventKind.REQUEST_CANCELLED))
-                .containsExactlyInAnyOrder(requesterId, target1Id, managerId);
+                .containsExactlyInAnyOrder(target1Id, managerId);
     }
 
     @Test
@@ -188,7 +188,7 @@ class SubstituteRequestTransitionApiTest {
         assertThat(assignee()).isEqualTo(requesterId);
         api.transition(target2User, requestId, "accept").andExpect(status().isConflict());
         assertThat(notified(RequestEventKind.CANDIDATE_WITHDRAWN))
-                .containsExactlyInAnyOrder(requesterId, target1Id, managerId);
+                .containsExactlyInAnyOrder(requesterId, managerId);
     }
 
     @Test
@@ -202,7 +202,7 @@ class SubstituteRequestTransitionApiTest {
     // 매니저 승인·거절 -------------------------------------------------------------------------------
 
     @Test
-    void 승인하면_그_근무만_담당자가_후보로_바뀌고_처리_매니저_포함_알림() throws Exception {
+    void 승인하면_그_근무만_담당자가_후보로_바뀌고_처리한_매니저를_뺀_관계자에게_알림() throws Exception {
         long otherShift = api.shift(store.storeId(), requesterId, 2);
         api.transitionOk(target1User, requestId, "accept");
 
@@ -216,7 +216,7 @@ class SubstituteRequestTransitionApiTest {
         assertThat(shiftRepository.findById(otherShift).orElseThrow().getAssigneeMembershipId())
                 .isEqualTo(requesterId);
         assertThat(notified(RequestEventKind.MANAGER_APPROVED))
-                .containsExactlyInAnyOrder(requesterId, target1Id, managerId);
+                .containsExactlyInAnyOrder(requesterId, target1Id);
     }
 
     @Test
@@ -247,7 +247,7 @@ class SubstituteRequestTransitionApiTest {
         assertThat(data.get("status").asText()).isEqualTo("REJECTED");
         assertThat(assignee()).isEqualTo(requesterId);
         assertThat(notified(RequestEventKind.MANAGER_REJECTED))
-                .containsExactlyInAnyOrder(requesterId, target1Id, managerId);
+                .containsExactlyInAnyOrder(requesterId, target1Id);
     }
 
     @Test
@@ -292,7 +292,7 @@ class SubstituteRequestTransitionApiTest {
                 .andExpect(status().isOk()));
 
         assertThat(second).isEqualTo(first);
-        assertThat(notified(RequestEventKind.CANDIDATE_ACCEPTED)).hasSize(3);
+        assertThat(notified(RequestEventKind.CANDIDATE_ACCEPTED)).hasSize(2);
     }
 
     @Test

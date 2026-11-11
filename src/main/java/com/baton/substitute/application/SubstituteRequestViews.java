@@ -87,6 +87,9 @@ public final class SubstituteRequestViews {
             MemberRef candidate,
             @Schema(description = "받은 요청 목록에서만 본인 응답. 보낸 요청 목록에서는 null", nullable = true)
             String myResponse,
+            @Schema(description = "카드 점. 이 요청에 대해 아직 확인하지 않은 본인 알림(최근 7일)이 있으면 true. "
+                    + "상세를 열 때 POST /me/substitute-requests/{id}/check로 지운다")
+            boolean unchecked,
             Instant createdAt) {
     }
 
