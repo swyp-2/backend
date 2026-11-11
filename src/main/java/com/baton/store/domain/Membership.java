@@ -81,13 +81,14 @@ public class Membership {
     }
 
     /**
-     * 계정 탈퇴. 활성 소속은 WITHDRAWN으로 끝내고, 과거 소속을 포함해 개인 연결(user_id)을 끊는다.
+     * 계정 탈퇴. 활성·과거 소속 모두 WITHDRAWN으로 바꾸고 개인 연결(user_id)을 끊는다.
+     * 활성 소속이었으면 left_at = now, 이미 나간 소속은 나간 시각을 유지한다.
      */
     public void withdraw(Instant now) {
         if (isActive()) {
-            state = MembershipState.WITHDRAWN;
             leftAt = now;
         }
+        state = MembershipState.WITHDRAWN;
         userId = null;
     }
 
