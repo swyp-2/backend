@@ -1,6 +1,5 @@
 package com.baton.integration.stub;
 
-import com.baton.integration.ShiftAssignment;
 import com.baton.integration.StoreManagerQuery;
 import com.baton.integration.SubstituteRequestLifecycle;
 import jakarta.persistence.EntityManager;
@@ -17,12 +16,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 public class IntegrationStubConfig {
 
-    /** A가 ShiftAssignment 구현(@Service 등)을 추가하면 이 빈은 등록되지 않는다. */
-    @Bean
-    @ConditionalOnMissingBean(ShiftAssignment.class)
-    public ShiftAssignment shiftAssignmentStub(EntityManager entityManager) {
-        return new ShiftAssignmentStub(entityManager);
-    }
+    // ShiftAssignment 스텁은 A의 실제 구현(ShiftAssignmentService)이 들어와 삭제했다(2026-11-11 B 결정).
 
     /** A가 StoreManagerQuery 구현을 추가하면 이 빈은 등록되지 않는다. */
     @Bean

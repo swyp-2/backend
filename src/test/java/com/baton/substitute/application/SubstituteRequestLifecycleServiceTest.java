@@ -1,17 +1,24 @@
 package com.baton.substitute.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.baton.integration.ActiveRequestSummary;
+import com.baton.integration.MembershipQuery;
+import com.baton.integration.StoreManagerQuery;
+import com.baton.notification.application.NotificationWriter;
+import com.baton.notification.domain.NotificationRepository;
+import com.baton.substitute.domain.RequestEventRepository;
+import com.baton.substitute.domain.RequestRecipientRepository;
 import com.baton.substitute.domain.SubstituteRequest;
 import com.baton.substitute.domain.SubstituteRequestRepository;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -23,7 +30,10 @@ class SubstituteRequestLifecycleServiceTest {
     private static final long REQUESTER = 10L;
 
     private final SubstituteRequestRepository repository = mock(SubstituteRequestRepository.class);
-    private final SubstituteRequestLifecycleService service = new SubstituteRequestLifecycleService(repository);
+    private final SubstituteRequestLifecycleService service = new SubstituteRequestLifecycleService(repository,
+            mock(RequestRecipientRepository.class), mock(RequestEventRepository.class), mock(NotificationWriter.class),
+            mock(NotificationRepository.class), mock(MembershipQuery.class), mock(StoreManagerQuery.class),
+            Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
     void 진행_중_요청이_없으면_요약도_없다() {
@@ -48,13 +58,6 @@ class SubstituteRequestLifecycleServiceTest {
 
         assertThat(service.findActiveByShift(SHIFT_ID, 99L))
                 .contains(new ActiveRequestSummary(7L, "PENDING_MANAGER", false, true));
-    }
-
-    @Test
-    void 아직_구현_전인_정리와_파기는_예외_없이_끝난다() {
-        assertThat(service.closeBySourceDeleted(1L, 2L)).isEmpty();
-        assertThatCode(() -> service.cleanupOnMembershipLeave(1L)).doesNotThrowAnyException();
-        assertThatCode(() -> service.anonymizeFor(1L)).doesNotThrowAnyException();
     }
 
     private static SubstituteRequest waiting() {
