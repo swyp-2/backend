@@ -92,6 +92,29 @@ public interface SubstituteRequestRepository extends JpaRepository<SubstituteReq
 
     // 받은 요청: 본인이 지정 대상인 요청 ------------------------------------
 
+    // 매니저 요청 탭: 매장·상태별 (2026-11-16 추가) -----------------------------
+
+    @Query("""
+            select r from SubstituteRequest r
+            where r.storeId = :storeId and r.status = :status
+            order by r.createdAt desc, r.id desc
+            """)
+    List<SubstituteRequest> findStoreStatusFirstPage(@Param("storeId") Long storeId,
+                                                     @Param("status") SubstituteStatus status, Limit limit);
+
+    @Query("""
+            select r from SubstituteRequest r
+            where r.storeId = :storeId and r.status = :status
+              and (r.createdAt < :createdAt or (r.createdAt = :createdAt and r.id < :id))
+            order by r.createdAt desc, r.id desc
+            """)
+    List<SubstituteRequest> findStoreStatusAfter(@Param("storeId") Long storeId,
+                                                 @Param("status") SubstituteStatus status,
+                                                 @Param("createdAt") Instant createdAt, @Param("id") Long id,
+                                                 Limit limit);
+
+    // 받은 요청 (커서 처음) ----------------------------------------------------
+
     @Query("""
             select r from SubstituteRequest r, RequestRecipient x
             where x.requestId = r.id and x.targetMembershipId = :membershipId

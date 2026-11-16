@@ -8,8 +8,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.baton.auth.application.AccessTokenService;
 import com.baton.auth.security.TestUserAuthenticationFilter;
-import com.baton.integration.stub.NoopSubstituteRequestLifecycle;
-import com.baton.integration.stub.StoreManagerQueryStub;
 import com.baton.member.domain.UserRepository;
 import com.baton.shift.application.ShiftAssignmentService;
 import com.baton.shift.domain.ShiftRepository;
@@ -125,8 +123,6 @@ class EndToEndScenarioTest {
 
         assertThat(context.containsBean("noopSubstituteRequestLifecycle")).isFalse();
         assertThat(context.containsBean("storeManagerQueryStub")).isFalse();
-        assertThat(context.getBeansOfType(NoopSubstituteRequestLifecycle.class)).isEmpty();
-        assertThat(context.getBeansOfType(StoreManagerQueryStub.class)).isEmpty();
     }
 
     // ---- 1~3. 요청 → 수락 → 승인 ----

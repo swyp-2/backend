@@ -75,6 +75,18 @@ class SubstituteApiDocsTest {
     }
 
     @Test
+    void 매니저_목록_API는_status가_필수이고_같은_페이지_모양이다() {
+        JsonNode list = docs.get("paths").get("/stores/{storeId}/substitute-requests").get("get");
+
+        assertThat(parameter(list, "status").get("required").asBoolean()).isTrue();
+        assertThat(parameter(list, "status").toString())
+                .contains("PENDING_MANAGER").contains("APPROVED").contains("REJECTED");
+        assertThat(parameter(list, "cursor").path("required").asBoolean(false)).isFalse();
+        assertThat(list.get("responses").get("200").toString()).contains("SubstituteRequestPage");
+        assertThat(list.get("responses").get("403").toString()).contains("ErrorResponse");
+    }
+
+    @Test
     void 상태_전이_API_6개는_필수_헤더와_상세_응답_에러_스키마가_있다() {
         for (String action : List.of("accept", "reject", "cancel", "withdraw", "approve", "final-reject")) {
             JsonNode operation = docs.get("paths").get("/substitute-requests/{requestId}/" + action).get("post");

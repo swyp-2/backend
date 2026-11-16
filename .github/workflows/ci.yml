@@ -1,0 +1,29 @@
+# PR마다 전체 테스트를 돌린다. Testcontainers가 러너의 Docker로 PostgreSQL을 띄운다.
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      # gradlew가 실행 권한 없이 커밋돼 있어 bash로 실행한다
+      - run: bash gradlew test --no-daemon
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: build/reports/tests/test
