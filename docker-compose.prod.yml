@@ -8,6 +8,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       JAVA_TOOL_OPTIONS: "-Xms256m -Xmx768m -Duser.timezone=UTC"
+      # Apple 로그인 identityToken의 aud 허용값 = iOS 번들 ID. 비밀이 아니라 여기서 고정한다(.env 값보다 우선)
+      BATON_APPLE_CLIENT_IDS: com.swyp.baton
     ports:
       - "127.0.0.1:8080:8080"   # 외부 노출 X, Nginx만 접근
     logging:
