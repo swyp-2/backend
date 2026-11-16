@@ -107,17 +107,41 @@ public class SubstituteRequestQueryService {
                     ? requestRepository.findReceivedFirstPage(membershipId, limit)
                     : requestRepository.findReceivedAfter(membershipId, cursor.createdAt(), cursor.id(), limit);
         };
+        return toPage(rows, membershipId, box == RequestBox.RECEIVED);
+    }
+
+    /**
+     * 매니저 요청 탭(요청·승인·거절): 그 매장의 해당 상태 요청. 생성 시각·ID 내림차순 20개씩.
+     * 그 매장의 활성 매니저만 볼 수 있다(크루원·다른 매장·소속 해제는 FORBIDDEN).
+     * unchecked(카드 점)는 조회한 매니저 본인의 미확인 알림 기준이다.
+     */
+    public Page managerList(long userId, long storeId, ManagerRequestFilter filter, String cursorValue) {
+        ActiveMembership me = membershipQuery.requireActive(userId, storeId);
+        if (!MANAGER.equals(me.role())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        RequestCursor cursor = RequestCursor.decode(cursorValue);
+        Limit limit = Limit.of(PAGE_SIZE + 1);
+
+        List<SubstituteRequest> rows = cursor == null
+                ? requestRepository.findStoreStatusFirstPage(storeId, filter.status(), limit)
+                : requestRepository.findStoreStatusAfter(storeId, filter.status(), cursor.createdAt(), cursor.id(),
+                        limit);
+        return toPage(rows, me.membershipId(), false);
+    }
+
+    /** PAGE_SIZE + 1개까지 받은 행을 한 페이지로 자른다. withMyResponse면 viewer의 지정 대상 응답을 채운다. */
+    private Page toPage(List<SubstituteRequest> rows, long viewerMembershipId, boolean withMyResponse) {
         boolean hasMore = rows.size() > PAGE_SIZE;
         List<SubstituteRequest> page = hasMore ? rows.subList(0, PAGE_SIZE) : rows;
+        List<Long> requestIds = page.stream().map(SubstituteRequest::getId).toList();
 
-        Map<Long, String> myResponses = box == RequestBox.RECEIVED && !page.isEmpty()
-                ? recipientRepository.findByTargetMembershipIdAndRequestIdIn(membershipId,
-                                page.stream().map(SubstituteRequest::getId).toList()).stream()
+        Map<Long, String> myResponses = withMyResponse && !page.isEmpty()
+                ? recipientRepository.findByTargetMembershipIdAndRequestIdIn(viewerMembershipId, requestIds).stream()
                         .collect(Collectors.toMap(RequestRecipient::getRequestId, r -> r.getResponse().name()))
                 : Map.of();
 
-        Set<Long> unchecked = notificationService.uncheckedRequestIds(membershipId,
-                page.stream().map(SubstituteRequest::getId).toList());
+        Set<Long> unchecked = notificationService.uncheckedRequestIds(viewerMembershipId, requestIds);
 
         Names names = new Names(membershipQuery);
         List<Summary> items = page.stream()

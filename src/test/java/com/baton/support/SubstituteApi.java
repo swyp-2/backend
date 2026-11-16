@@ -155,6 +155,19 @@ public final class SubstituteApi {
         return mockMvc.perform(request);
     }
 
+    /** 매니저 요청 탭 목록. status·cursor가 null이면 파라미터를 보내지 않는다. */
+    public ResultActions managerList(long userId, long storeId, String status, String cursor) throws Exception {
+        MockHttpServletRequestBuilder request = get("/stores/{storeId}/substitute-requests", storeId)
+                .header(TestUserAuthenticationFilter.HEADER, userId);
+        if (status != null) {
+            request.param("status", status);
+        }
+        if (cursor != null) {
+            request.param("cursor", cursor);
+        }
+        return mockMvc.perform(request);
+    }
+
     // 빨간 점(알림) ------------------------------------------------------
 
     public ResultActions indicator(long userId) throws Exception {

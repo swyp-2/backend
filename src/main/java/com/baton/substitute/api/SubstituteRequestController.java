@@ -7,6 +7,7 @@ import com.baton.common.ErrorResponse;
 import com.baton.common.idempotency.IdempotencyCommand;
 import com.baton.common.idempotency.IdempotencyScope;
 import com.baton.common.idempotency.IdempotencyService;
+import com.baton.substitute.application.ManagerRequestFilter;
 import com.baton.substitute.application.RequestBox;
 import com.baton.substitute.application.SubstituteRequestCommandService;
 import com.baton.substitute.application.SubstituteRequestQueryService;
@@ -138,6 +139,38 @@ public class SubstituteRequestController {
                                   @Parameter(description = "이전 응답의 next_cursor. 첫 페이지는 생략")
                                   @RequestParam(required = false) String cursor) {
         return ApiResponse.ok(queryService.list(authUser.userId(), RequestBox.parse(box), cursor), clock);
+    }
+
+    /** 매니저 요청 탭: 요청(PENDING_MANAGER)·승인(APPROVED)·거절(REJECTED). 20개씩, next_cursor로 다음 페이지. */
+    @Operation(summary = "매니저 요청 탭 목록", description = """
+            그 매장의 대타 요청을 상태별로 보여준다. 그 매장의 활성 매니저만.
+            요청 탭은 status=PENDING_MANAGER(승인 대기), 승인 탭은 APPROVED, 거절 탭은 REJECTED(매니저 최종 거절).
+            요청 생성 시각·id 내림차순 20개씩. 다음 페이지는 응답의 next_cursor를 cursor로 보낸다.
+            항목 모양은 GET /me/substitute-requests와 같고 my_response는 항상 null이다.
+            unchecked(카드 점)는 조회한 매니저 본인의 미확인 알림 기준이며, 상세를 열 때
+            POST /me/substitute-requests/{id}/check로 지운다.
+
+            - 403 FORBIDDEN: 크루원 / 다른 매장 / 활성 소속 없음
+            - 422 VALIDATION_FAILED: status 누락·잘못된 값, cursor 형식 오류
+            """)
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "요청 목록"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "권한 없음",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "422", description = "입력 오류",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    @GetMapping("/stores/{storeId}/substitute-requests")
+    public ApiResponse<Page> managerList(@CurrentUser AuthUser authUser, @PathVariable long storeId,
+                                         @Parameter(description = "PENDING_MANAGER(요청 탭), APPROVED(승인 탭), "
+                                                 + "REJECTED(거절 탭)", required = true,
+                                                 schema = @Schema(allowableValues = {"PENDING_MANAGER", "APPROVED",
+                                                         "REJECTED"}))
+                                         @RequestParam(required = false) String status,
+                                         @Parameter(description = "이전 응답의 next_cursor. 첫 페이지는 생략")
+                                         @RequestParam(required = false) String cursor) {
+        return ApiResponse.ok(queryService.managerList(authUser.userId(), storeId,
+                ManagerRequestFilter.parse(status), cursor), clock);
     }
 
     // 상태 전이(RQ-03 / AP-02). 본문 없음, Idempotency-Key 필수, 응답은 처리 후 최신 상세 ----------------------------
