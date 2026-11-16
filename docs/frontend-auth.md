@@ -177,6 +177,7 @@ Authorization: Bearer <access_token>
 ## 6-1. 약관 동의 (CO-02 / CO-03)
 
 - `GET /consent-documents`의 `body_reference`는 **약관 본문 URL**(https 절대 경로)이다. CO-03에서 이 URL의 본문을 보여준다.
+  운영 약관 v1: 이용약관 `https://swyp-2.github.io/frontend/terms/v1/`, 개인정보 처리방침 `https://swyp-2.github.io/frontend/privacy/v1/` (둘 다 필수).
   보기·닫기만으로는 동의가 저장되지 않는다.
 - `POST /me/consents`의 `agreements`에 빠진 선택 약관은 서버가 **"동의 안 함"으로 기록**한다.
   필수 약관이 빠지거나 `agreed: false`면 422 `VALIDATION_FAILED`(`field`: `agreements[document_id=N]`).

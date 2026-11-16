@@ -382,3 +382,27 @@ B에게 확인 요청
 - `SubstituteRequestLifecycleService.cleanupOnMembershipLeave`·`anonymizeFor`가 아직 빈 구현이다.
   정책 D05의 "본인 수신 알림 파기"는 anonymizeFor 책임이므로 구현이 필요하다(A는 호출만 한다)
 - anonymizeFor는 A가 user_id를 끊기 **전에** 호출된다(호출 시점에 membership 행은 잠겨 있고 아직 user_id가 있다)
+
+## API 추가: 매니저 요청 탭 목록 (2026-11-16, 프론트 출시 작업 중 추가)
+
+프론트 매니저 요청 탭(요청·승인·거절) 시안을 연결하기 위한 조회 API. 알림 목록(NT-01)과는 별개이며 알림 결정(위 "빨간 점")은 그대로다.
+B 소유 패키지(com.baton.substitute)를 수정했으므로 B 리뷰 필요.
+
+| 메서드·경로 | 누가 | 응답 |
+| --- | --- | --- |
+| GET /stores/{storeId}/substitute-requests?status=PENDING_MANAGER\|APPROVED\|REJECTED&cursor= | 그 매장의 활성 매니저 | {items, next_cursor, has_more} (RQ-02 목록과 같은 모양) |
+
+- 탭 매핑: 요청 = PENDING_MANAGER(승인 대기), 승인 = APPROVED, 거절 = REJECTED(매니저 최종 거절). 그 밖의 종료 상태는 매니저 탭에 나오지 않는다
+- 정렬·페이지: 생성 시각·id 내림차순 20개, `RequestCursor` 재사용
+- `my_response`는 항상 null, `unchecked`는 조회한 매니저 본인의 미확인 알림 기준(상세 진입 시 check로 지움)
+- 에러: 크루원·다른 매장·소속 없음 403 / status 누락·잘못된 값, cursor 형식 오류 422
+- 구현: `ManagerRequestFilter`(status 파싱), `SubstituteRequestQueryService.managerList`, 리포지토리 `findStoreStatusFirstPage`·`findStoreStatusAfter`.
+  보낸·받은 목록과 페이지 조립은 `toPage`로 공유
+- 인덱스는 추가하지 않았다(MVP 규모). 매장당 요청이 많아지면 (store_id, status, created_at DESC, id DESC) 인덱스 검토
+
+## 운영 약관 v1 (2026-11-16)
+
+- `V202611161200__a_consent_documents_v1.sql`: TERMS_OF_SERVICE v1·PRIVACY_POLICY v1(둘 다 필수)을 운영 포함 모든 프로필에 넣는다.
+  본문은 프론트 레포 GitHub Pages(`https://swyp-2.github.io/frontend/terms/v1/`, `.../privacy/v1/`)
+- 같은 (kind, version)이 이미 있으면 덮어쓴다(운영에 손으로 넣은 행 대비)
+- local 시드(`db/seed/local`)에는 local 전용 선택 약관(MARKETING)만 남겼다. 운영에는 마케팅 동의가 없다

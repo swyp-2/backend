@@ -1,0 +1,76 @@
+# develop에 머지되면 테스트를 통과한 뒤 EC2에 배포한다.
+# EC2의 클론 디렉터리에서 develop을 받아 docker-compose.prod.yml로 다시 빌드·기동하고 /health가 UP인지 확인한다.
+# 비밀 값(.env)은 EC2에만 있다. 이 워크플로·레포에 넣지 않는다.
+#
+# 필요한 저장소 시크릿
+#   EC2_HOST     서버 주소(예: 3.36.158.96)
+#   EC2_USER     SSH 사용자(예: ubuntu, ec2-user)
+#   EC2_SSH_KEY  SSH 개인 키 전체(PEM)
+#   EC2_APP_DIR  서버의 레포 클론 경로(예: /home/ubuntu/backend)
+name: Deploy
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: bash gradlew test --no-daemon
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: SSH 키 준비
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+
+      - name: 배포
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_APP_DIR: ${{ secrets.EC2_APP_DIR }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "$EC2_USER@$EC2_HOST" "APP_DIR='$EC2_APP_DIR' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$APP_DIR"
+          git fetch origin develop
+          git checkout develop
+          git pull --ff-only origin develop
+          docker compose -f docker-compose.prod.yml up -d --build
+          docker image prune -f >/dev/null
+
+          # Flyway 마이그레이션까지 끝나야 UP이 된다. 최대 3분 기다린다.
+          for i in $(seq 1 36); do
+            if curl -fsS http://127.0.0.1:8080/health | grep -q '"UP"'; then
+              echo "health UP ($(git rev-parse --short HEAD))"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "health check failed" >&2
+          docker compose -f docker-compose.prod.yml logs --tail 200 app >&2
+          exit 1
+          REMOTE

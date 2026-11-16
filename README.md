@@ -42,6 +42,16 @@ Testcontainers가 `postgres:16` 컨테이너를 직접 띄우므로 Docker만 �
 
 비밀 값은 설정 파일에 쓰지 않고 환경변수로만 주입한다.
 
+## CI/CD
+
+| 워크플로 | 언제 | 하는 일 |
+|---|---|---|
+| `.github/workflows/ci.yml` | develop·main 대상 PR | `./gradlew test` |
+| `.github/workflows/deploy.yml` | develop push(머지) | 테스트 → EC2 SSH → `git pull` → `docker compose -f docker-compose.prod.yml up -d --build` → `/health` UP 확인 |
+
+배포에 필요한 저장소 시크릿: `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `EC2_APP_DIR`(서버의 레포 클론 경로).
+운영 비밀 값은 EC2의 `.env`에만 둔다(`BATON_JWT_SECRET`, `BATON_GOOGLE_CLIENT_IDS`, `BATON_APPLE_CLIENT_IDS`, DB 접속 정보 등).
+
 ## 문서
 
 - `CLAUDE.md`: 개발 규칙
