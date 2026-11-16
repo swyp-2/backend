@@ -68,7 +68,9 @@ class ConsentApiTest {
                 .andExpect(jsonPath("$.data[0].document_id").isNumber())
                 .andExpect(jsonPath("$.data[0].version").value(1))
                 .andExpect(jsonPath("$.data[?(@.kind == 'TERMS_OF_SERVICE')].body_reference")
-                        .value("https://example.com/baton/terms/terms-of-service/v1"))
+                        .value("https://swyp-2.github.io/frontend/terms/v1/"))
+                .andExpect(jsonPath("$.data[?(@.kind == 'PRIVACY_POLICY')].body_reference")
+                        .value("https://swyp-2.github.io/frontend/privacy/v1/"))
                 .andExpect(jsonPath("$.meta.server_time").exists());
     }
 
