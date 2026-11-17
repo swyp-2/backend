@@ -52,6 +52,13 @@ Testcontainers가 `postgres:16` 컨테이너를 직접 띄우므로 Docker만 �
 배포에 필요한 저장소 시크릿: `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `EC2_APP_DIR`(서버의 레포 클론 경로).
 운영 비밀 값은 EC2의 `.env`에만 둔다(`BATON_JWT_SECRET`, `BATON_GOOGLE_CLIENT_IDS`, `BATON_APPLE_CLIENT_IDS`, DB 접속 정보 등).
 
+자동 배포는 서버 레포를 배포한 커밋에 고정(detached HEAD)한다. 서버에서 수동 배포할 때는 브랜치로 먼저 돌아간다.
+
+```bash
+git checkout develop && git pull origin develop
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
 ## 문서
 
 - `CLAUDE.md`: 개발 규칙
