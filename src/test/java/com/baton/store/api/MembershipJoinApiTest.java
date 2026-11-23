@@ -61,6 +61,16 @@ class MembershipJoinApiTest {
     }
 
     @Test
+    void 심사용_고정_코드로_실제_매장에_참여할_수_있다() throws Exception {
+        long crewId = onboarding.userWithRole("CREW");
+
+        api.join(crewId, "BATON826").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.store_name").value("BATON 심사용 매장"))
+                .andExpect(jsonPath("$.data.role").value("CREW"));
+        onboarding.me(crewId).andExpect(jsonPath("$.data.next_screen").value("CA-01"));
+    }
+
+    @Test
     void 형식_오류는_422_VALIDATION_FAILED_소문자도_거부() throws Exception {
         long crewId = onboarding.userWithRole("CREW");
         for (String input : new String[]{"abc12345", code.toLowerCase(), "", "ABC1234", "ABC123456", "ABCD-123", null}) {
