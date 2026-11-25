@@ -61,4 +61,12 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             where s.assigneeMembershipId = :membershipId and s.deletedAt is null and s.endsAt > :now
             """)
     boolean existsUnfinishedByAssignee(@Param("membershipId") Long membershipId, @Param("now") Instant now);
+
+    /** 탈퇴 시 본인에게 남은 근무를 ID 순으로 잠가 삭제한다. */
+    @Query("""
+            select s.id from Shift s
+            where s.assigneeMembershipId = :membershipId and s.deletedAt is null and s.endsAt > :now
+            order by s.id
+            """)
+    List<Long> findUnfinishedIdsByAssignee(@Param("membershipId") Long membershipId, @Param("now") Instant now);
 }

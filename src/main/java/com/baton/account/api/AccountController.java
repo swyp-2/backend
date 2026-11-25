@@ -60,18 +60,16 @@ public class AccountController {
     @Operation(summary = "계정 탈퇴", description = """
             PRO-03 / PR-04
 
-            확인 후 계정을 종료한다. 모든 세션이 즉시 끝나 기존 토큰은 401이 된다.
+            확인 후 계정을 종료한다. 본인의 미종료 근무와 관련 대타 요청도 함께 종료한다.
+            모든 세션이 즉시 끝나 기존 토큰은 401이 된다.
             이름·소셜 식별자·동의 기록·소속 연결을 파기하고, 다른 구성원의 근무표·기록에는 "탈퇴한 구성원"으로 표시된다.
             같은 소셜 계정으로 다시 로그인하면 새 회원으로 가입한다.
 
             - 401 UNAUTHENTICATED: 인증 필요(이미 탈퇴한 계정 포함)
-            - 409 FUTURE_SHIFT_REMAINS: 끝나지 않은 본인 근무(예정·진행 중)가 있음. 아무것도 바뀌지 않는다
             """)
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "탈퇴함"),
             @ApiResponse(responseCode = "401", description = "인증 필요",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "409", description = "남은 근무 있음",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @DeleteMapping("/me")

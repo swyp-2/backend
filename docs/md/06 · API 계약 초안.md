@@ -54,7 +54,7 @@
 | GET | /me/notification-indicator | 본인 | CA-01/02 | 최근 7일 미읽음 존재 여부 | 매니저도 승인 대기 건수가 아닌 미읽음 기준. |
 | POST | /auth/logout | 본인 | PR-04 | 현재 세션 종료 | 계정·매장 소속은 삭제하지 않음. |
 | POST | /stores/{store\_id}/leave | 본인 소속 | PR-04 | 확인 후 매장 나가기 | 미종료 배정 근무 차단·진행 요청 정리·접근 해제 동시 확정. 마지막 매니저 특수 처리 후속. |
-| DELETE | /me | 본인 | PR-04 | 확인 후 계정 탈퇴 | 미종료 배정 근무 검사·요청 정리·일반 개인정보 파기·법정 보안기록 구분. |
+| DELETE | /me | 본인 | PR-04 | 확인 후 계정 탈퇴 | 미종료 본인 근무 자동 종료·관련 요청 정리·일반 개인정보 파기·법정 보안기록 구분. |
 
 ## 3. 공통 응답·오류 예시
 
@@ -99,7 +99,7 @@
 | REQUEST\_STATE\_CONFLICT | 409 | 다른 수락·승인·취소·철회와 경합. 최신 상태 재조회. |
 | REQUEST\_EXPIRED | 409 | 시작 시각 이후 처리 불가. |
 | PREVIEW\_STALE | 409 | 입력 유지·미리보기 재계산 요청. |
-| FUTURE\_SHIFT\_REMAINS | 409 | 예정/진행 근무 정리 안내. 소속 해제·탈퇴 미확정. |
+| FUTURE\_SHIFT\_REMAINS | 409 | 예정/진행 근무 정리 안내. 매장 나가기 미확정(계정 탈퇴는 본인 근무 자동 종료). |
 | ONBOARDING\_STAGE\_CONFLICT | 409 | 현재 가입 단계에서 할 수 없는 작업(이미 지난 단계 재제출 등). current\_state에 현재 onboarding\_stage. GET /me 재조회 후 next\_screen으로 이동. |
 | ALREADY\_IN\_STORE | 409 | 이미 활성 매장 소속이 있어 매장 생성·참여 불가(계정당 활성 매장 1개). |
 | SHIFT\_STATE\_CONFLICT | 409 | 근무가 삭제됐거나 담당자·버전이 바뀜. 최신 근무 재조회. |

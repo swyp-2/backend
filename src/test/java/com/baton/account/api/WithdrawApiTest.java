@@ -53,32 +53,35 @@ class WithdrawApiTest {
     }
 
     @Test
-    void 내일_근무가_남은_크루원은_탈퇴할_수_없고_아무것도_바뀌지_않는다() throws Exception {
+    void 내일_근무가_남은_크루원도_혼자_탈퇴하고_근무는_종료된다() throws Exception {
         LoggedIn crew = fx.loginAndOnboard("하윤", "CREW");
         long membership = fx.join(crew.userId(), store.code());
         Instant tomorrow = Instant.now().plus(Duration.ofDays(1));
-        fx.shift(store.storeId(), membership, tomorrow, tomorrow.plus(Duration.ofHours(4)));
+        long shiftId = fx.shift(store.storeId(), membership, tomorrow, tomorrow.plus(Duration.ofHours(4)));
 
-        fx.withdraw(crew.userId())
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("FUTURE_SHIFT_REMAINS"))
-                .andExpect(jsonPath("$.current_state").doesNotExist());
+        fx.withdraw(crew.userId()).andExpect(status().isNoContent());
 
-        assertNotWithdrawn(crew, membership);
+        assertThat(jdbcTemplate.queryForObject("SELECT deleted_at FROM shifts WHERE id = ?", Instant.class, shiftId))
+                .isNotNull();
+        assertThat(count("SELECT count(*) FROM shift_events WHERE shift_id = ? AND event_kind = 'DELETED'", shiftId))
+                .isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM memberships WHERE user_id = ?", crew.userId())).isZero();
+        mockMvc.perform(get("/me").header("Authorization", AuthApi.bearer(crew.accessToken())))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void 지금_진행_중인_근무가_있어도_탈퇴할_수_없다() throws Exception {
+    void 지금_진행_중인_근무도_탈퇴하며_종료된다() throws Exception {
         LoggedIn crew = fx.loginAndOnboard("하윤", "CREW");
         long membership = fx.join(crew.userId(), store.code());
         Instant now = Instant.now();
-        fx.shift(store.storeId(), membership, now.minus(Duration.ofHours(2)), now.plus(Duration.ofMinutes(30)));
+        long shiftId = fx.shift(store.storeId(), membership,
+                now.minus(Duration.ofHours(2)), now.plus(Duration.ofMinutes(30)));
 
-        fx.withdraw(crew.userId())
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("FUTURE_SHIFT_REMAINS"));
+        fx.withdraw(crew.userId()).andExpect(status().isNoContent());
 
-        assertNotWithdrawn(crew, membership);
+        assertThat(jdbcTemplate.queryForObject("SELECT deleted_at FROM shifts WHERE id = ?", Instant.class, shiftId))
+                .isNotNull();
     }
 
     @Test
@@ -203,27 +206,6 @@ class WithdrawApiTest {
         assertThat(jdbcTemplate.queryForObject("SELECT account_state FROM users WHERE id = ?", String.class, user))
                 .isEqualTo("WITHDRAWN");
         fx.withdraw(user).andExpect(status().isUnauthorized());
-    }
-
-    private void assertNotWithdrawn(LoggedIn crew, long membership) throws Exception {
-        long userId = crew.userId();
-        Map<String, Object> user = jdbcTemplate.queryForMap(
-                "SELECT display_name, selected_role, account_state, withdrawn_at, onboarding_stage FROM users "
-                        + "WHERE id = ?", userId);
-        assertThat(user.get("display_name")).isEqualTo("하윤");
-        assertThat(user.get("selected_role")).isEqualTo("CREW");
-        assertThat(user.get("account_state")).isEqualTo("ACTIVE");
-        assertThat(user.get("withdrawn_at")).isNull();
-        assertThat(user.get("onboarding_stage")).isEqualTo("COMPLETED");
-        assertThat(count("SELECT count(*) FROM social_accounts WHERE user_id = ?", userId)).isEqualTo(1);
-        assertThat(count("SELECT count(*) FROM user_consents WHERE user_id = ?", userId)).isPositive();
-        assertThat(count("SELECT count(*) FROM auth_sessions WHERE user_id = ?", userId)).isEqualTo(1);
-        Map<String, Object> row = jdbcTemplate.queryForMap(
-                "SELECT state, user_id FROM memberships WHERE id = ?", membership);
-        assertThat(row.get("state")).isEqualTo("ACTIVE");
-        assertThat(((Number) row.get("user_id")).longValue()).isEqualTo(userId);
-        mockMvc.perform(get("/me").header("Authorization", AuthApi.bearer(crew.accessToken())))
-                .andExpect(status().isOk());
     }
 
     private long count(String sql, Object... args) {
