@@ -24,6 +24,7 @@ import com.baton.member.domain.User;
 import com.baton.member.domain.UserConsentRepository;
 import com.baton.member.domain.UserRepository;
 import com.baton.shift.domain.ShiftRepository;
+import com.baton.shift.application.ShiftWithdrawalService;
 import com.baton.store.domain.Membership;
 import com.baton.store.domain.MembershipRepository;
 import com.baton.store.domain.MembershipState;
@@ -46,6 +47,7 @@ class AccountServiceTest {
     private final UserRepository userRepository = mock(UserRepository.class);
     private final MembershipRepository membershipRepository = mock(MembershipRepository.class);
     private final ShiftRepository shiftRepository = mock(ShiftRepository.class);
+    private final ShiftWithdrawalService shiftWithdrawalService = mock(ShiftWithdrawalService.class);
     private final AuthSessionRepository authSessionRepository = mock(AuthSessionRepository.class);
     private final SocialAccountRepository socialAccountRepository = mock(SocialAccountRepository.class);
     private final UserConsentRepository userConsentRepository = mock(UserConsentRepository.class);
@@ -57,7 +59,7 @@ class AccountServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AccountService(userRepository, membershipRepository, shiftRepository, authSessionRepository,
+        service = new AccountService(userRepository, membershipRepository, shiftRepository, shiftWithdrawalService, authSessionRepository,
                 socialAccountRepository, userConsentRepository, idempotencyRecordRepository, lifecycle,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         user = User.signUp();
@@ -131,9 +133,9 @@ class AccountServiceTest {
 
         service.withdraw(USER_ID);
 
-        InOrder order = inOrder(shiftRepository, lifecycle, idempotencyRecordRepository, authSessionRepository,
+        InOrder order = inOrder(shiftWithdrawalService, lifecycle, idempotencyRecordRepository, authSessionRepository,
                 socialAccountRepository, userConsentRepository);
-        order.verify(shiftRepository).existsUnfinishedByAssignee(10L, NOW);
+        order.verify(shiftWithdrawalService).deleteUnfinished(10L, NOW);
         order.verify(lifecycle).cleanupOnMembershipLeave(10L);
         order.verify(lifecycle).anonymizeFor(5L);
         order.verify(lifecycle).anonymizeFor(10L);
@@ -157,19 +159,17 @@ class AccountServiceTest {
     }
 
     @Test
-    void 탈퇴_시_끝나지_않은_근무가_있으면_아무것도_지우지_않는다() {
+    void 탈퇴는_남은_근무를_정리하고_매니저_도움_없이_완료된다() {
         Membership active = membership(10L);
         given(membershipRepository.findAllByUserIdForUpdate(USER_ID)).willReturn(List.of(active));
-        given(shiftRepository.existsUnfinishedByAssignee(10L, NOW)).willReturn(true);
 
-        assertThatThrownBy(() -> service.withdraw(USER_ID))
-                .isInstanceOfSatisfying(BusinessException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FUTURE_SHIFT_REMAINS));
+        service.withdraw(USER_ID);
 
-        verifyNoInteractions(lifecycle, authSessionRepository, socialAccountRepository, userConsentRepository,
-                idempotencyRecordRepository);
-        assertThat(active.getState()).isEqualTo(MembershipState.ACTIVE);
-        assertThat(user.getAccountState()).isEqualTo(AccountState.ACTIVE);
+        InOrder order = inOrder(shiftWithdrawalService, lifecycle);
+        order.verify(shiftWithdrawalService).deleteUnfinished(10L, NOW);
+        order.verify(lifecycle).cleanupOnMembershipLeave(10L);
+        assertThat(active.getState()).isEqualTo(MembershipState.WITHDRAWN);
+        assertThat(user.getAccountState()).isEqualTo(AccountState.WITHDRAWN);
     }
 
     @Test
@@ -180,6 +180,7 @@ class AccountServiceTest {
 
         verify(lifecycle, never()).cleanupOnMembershipLeave(anyLong());
         verify(lifecycle, never()).anonymizeFor(anyLong());
+        verifyNoInteractions(shiftWithdrawalService);
         verify(shiftRepository, never()).existsUnfinishedByAssignee(anyLong(), any());
         verify(authSessionRepository).deleteByUserId(USER_ID);
         assertThat(user.getAccountState()).isEqualTo(AccountState.WITHDRAWN);

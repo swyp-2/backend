@@ -10,6 +10,7 @@ import com.baton.member.domain.User;
 import com.baton.member.domain.UserConsentRepository;
 import com.baton.member.domain.UserRepository;
 import com.baton.shift.domain.ShiftRepository;
+import com.baton.shift.application.ShiftWithdrawalService;
 import com.baton.store.domain.Membership;
 import com.baton.store.domain.MembershipRepository;
 import java.time.Clock;
@@ -24,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>잠금 순서: user → membership → shift → substitute_request. 매장 생성·참여(user → membership)와 같고,
  * B의 수락·승인·생성(lockActiveById)과 일괄 등록(FOR SHARE)은 같은 membership 행에서 직렬화된다.
- * 확정 직전에 미종료 본인 배정 근무를 다시 확인하고, 있으면 아무것도 바꾸지 않는다.
+ * 매장 나가기는 미종료 본인 근무가 있으면 막고, 탈퇴는 해당 근무를 함께 종료한다.
  * 소속 해제·요청 정리(B)·개인정보 파기는 한 트랜잭션에서 함께 확정하므로 어느 하나가 실패하면 전부 롤백된다.
  */
 @Service
@@ -34,6 +35,7 @@ public class AccountService {
     private final UserRepository userRepository;
     private final MembershipRepository membershipRepository;
     private final ShiftRepository shiftRepository;
+    private final ShiftWithdrawalService shiftWithdrawalService;
     private final AuthSessionRepository authSessionRepository;
     private final SocialAccountRepository socialAccountRepository;
     private final UserConsentRepository userConsentRepository;
@@ -58,7 +60,7 @@ public class AccountService {
     }
 
     /**
-     * 계정 탈퇴. 활성 소속이 있으면 나가기와 같은 사전 검사·요청 정리를 먼저 하고,
+     * 계정 탈퇴. 활성 소속의 미종료 근무와 관련 요청을 정리한 뒤,
      * 과거 소속을 포함한 모든 소속의 개인 연결과 인증·동의 기록을 파기한다. users 행은 개인 연결 없는 톰스톤으로 남긴다.
      */
     @Transactional
@@ -68,7 +70,8 @@ public class AccountService {
         Instant now = clock.instant();
         for (Membership membership : memberships) {
             if (membership.isActive()) {
-                releaseActive(membership, now);
+                shiftWithdrawalService.deleteUnfinished(membership.getId(), now);
+                substituteRequestLifecycle.cleanupOnMembershipLeave(membership.getId());
             }
         }
         for (Membership membership : memberships) {
@@ -85,7 +88,7 @@ public class AccountService {
         userRepository.flush();
     }
 
-    /** 잠긴 활성 소속의 해제 전 공통 처리: 미종료 근무 검사 → (마지막 매니저 자리) → 요청 정리. */
+    /** 매장 나가기 전 처리: 미종료 근무 검사 → (마지막 매니저 자리) → 요청 정리. */
     private void releaseActive(Membership membership, Instant now) {
         if (shiftRepository.existsUnfinishedByAssignee(membership.getId(), now)) {
             throw new BusinessException(ErrorCode.FUTURE_SHIFT_REMAINS);
